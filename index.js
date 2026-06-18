@@ -773,7 +773,8 @@ class MimoTtsProvider {
             return;
         }
 
-        const text = this.getMessageSpeakText(messageElement);
+        const rawText = this.getMessageSpeakText(messageElement);
+        const text = this.cleanMessageText(rawText);
 
         if (!text) {
             throw new Error('这条消息没有可朗读文本。');
@@ -795,7 +796,7 @@ class MimoTtsProvider {
 
             this.writeDebugLog({
                 title: '独立播放',
-                originalText: text,
+                originalText: rawText,
                 processedText: this.formatPreparedSpeechForLog(preparedSpeech),
                 cacheHit,
                 voiceName: voice.name,
@@ -1613,6 +1614,7 @@ class MimoTtsProvider {
             .replace(/^\s*(?:处理后文本|处理结果|最终文本|输出|朗读文本|TTS文本)\s*[:：]\s*/i, '')
             .replace(/^\s*[-*]\s+/gm, '')
             .replace(/^["'“”]+|["'“”]+$/g, '')
+            .replace(/[❤️♡♥☆★♪♫©®™▪◆◇●○►◄▸◂▴▾▵▿]+/g, '')
             .trim();
     }
 
