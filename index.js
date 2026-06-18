@@ -312,8 +312,28 @@ class MimoTtsProvider {
         }
 
         this.settings = extension_settings[extensionName];
+        this.mergeDefaultVoiceCatalogs();
         this.normalizeVoiceIds();
         return this.settings;
+    }
+
+    mergeDefaultVoiceCatalogs() {
+        this.settings.presetVoices = this.mergeVoiceCatalog(this.settings.presetVoices, this.defaultSettings.presetVoices);
+        this.settings.designedVoices = this.mergeVoiceCatalog(this.settings.designedVoices, this.defaultSettings.designedVoices);
+    }
+
+    mergeVoiceCatalog(savedVoices, defaultVoices) {
+        const merged = Array.isArray(savedVoices) ? [...savedVoices] : [];
+        const existingIds = new Set(merged.map((voice) => voice.voice_id));
+        const existingNames = new Set(merged.map((voice) => voice.name));
+
+        for (const defaultVoice of defaultVoices) {
+            if (!existingIds.has(defaultVoice.voice_id) && !existingNames.has(defaultVoice.name)) {
+                merged.push(structuredClone(defaultVoice));
+            }
+        }
+
+        return merged;
     }
 
     async loadSettings(settings) {
