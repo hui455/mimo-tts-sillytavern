@@ -337,7 +337,7 @@ class MimoTtsProvider {
 
         this.settings = extension_settings[extensionName];
         this.mergeDefaultVoiceCatalogs();
-        this.migrateDesignedVoicesToFemaleDefaults();
+        this.migrateVoiceCatalogToFemaleDefaults();
         this.normalizeVoiceIds();
         return this.settings;
     }
@@ -362,8 +362,8 @@ class MimoTtsProvider {
         return merged;
     }
 
-    migrateDesignedVoicesToFemaleDefaults() {
-        if (this.settings.designedVoiceCatalogMode === 'female-defaults-v1') {
+    migrateVoiceCatalogToFemaleDefaults() {
+        if (this.settings.voiceCatalogMode === 'female-defaults-v2') {
             return;
         }
 
@@ -373,7 +373,13 @@ class MimoTtsProvider {
                 .filter((voice) => !defaultFemaleIds.has(voice.voice_id))
                 .map((voice) => voice.voice_id),
         );
+        for (const voice of this.settings.clonedVoices) {
+            removedVoiceIds.add(voice.voice_id);
+        }
+
         this.settings.designedVoices = structuredClone(this.defaultSettings.designedVoices);
+        this.settings.clonedVoices = [];
+        this.settings.voiceCatalogMode = 'female-defaults-v2';
         this.settings.designedVoiceCatalogMode = 'female-defaults-v1';
 
         if (removedVoiceIds.has(this.settings.independentVoiceId)) {
@@ -1091,7 +1097,7 @@ class MimoTtsProvider {
 
     async buildAudioCacheKey(inputText, voice) {
         const material = JSON.stringify({
-            version: 4,
+            version: 5,
             inputText,
             voice,
             baseUrl: this.normalizeBaseUrl(this.settings.baseUrl),
