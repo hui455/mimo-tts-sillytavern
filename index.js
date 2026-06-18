@@ -49,7 +49,7 @@ class MimoTtsProvider {
 规则：
 1. 只输出当前控制模式要求的结果，不要解释，不要 Markdown；只有"自然语言控制"模式允许输出指定 JSON。
 2. 绝对不能改写、润色、扩写、删改或替换原对白文字本身；对白内容必须从输入里原样截取。
-3. 你只允许做当前模式要求的处理：整理正文叙述；或为 MiMo 生成自然语言控制说明；或在对白前/对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（轻笑）（大笑）（冷笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
+3. 你只允许做当前模式要求的处理：删除正文叙述（只留对白）；或为 MiMo 生成自然语言控制说明；或在对白前/对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（轻笑）（大笑）（冷笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
 4. 彻底删除所有非对话正文内容：场景描写、动作描写、旁白、环境描写，仅保留角色说出口的对白和内心独白。不要保留任何叙述性文字。
 5. 同时删除以下技术噪音：系统提示、玩家指令、URL、代码块、角色名标签、楼层信息、表情包、纯括号动作说明（他笑了一下）（她点点头）。
 6. 保留称呼、口癖、错字和标点风格；保留句子间正常感叹（呀、呢、吧、嘛等句尾语气助词）。
@@ -65,26 +65,6 @@ class MimoTtsProvider {
 （寒冷导致的急促呼吸）呼——呼——这、这大兴安岭的雪……（咳嗽）简直能把人骨头冻透了……别、别停下，走，快走。
 （提高音量喊话）大姐！这鱼新鲜着呢！早上刚捞上来的！哎！那个谁，别乱翻，压坏了你赔啊？！
 （意乱情迷的喘息）嗯……啊……主人……唔……不要停……（满足的轻哼）哈啊……好舒服……`,
-        preprocessPromptCondense: `你是 SillyTavern 角色对白的 TTS 表演脚本整理器。你的任务是把输入段落整理成适合 MiMo TTS 朗读的中文表演文本。
-
-规则：
-1. 只输出当前控制模式要求的结果，不要解释，不要 Markdown；只有"自然语言控制"模式允许输出指定 JSON。
-2. 绝对不能改写、润色、扩写、删改或替换原对白文字本身；对白内容必须从输入里原样截取。
-3. 你只允许做当前模式要求的处理：浓缩正文叙述；或为 MiMo 生成自然语言控制说明；或在对白前/对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（轻笑）（大笑）（冷笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
-4. 正文中的场景描写、动作描写、旁白不要直接删除，而是浓缩为一句简短自然的衔接语保留在对白之间作为过渡。例如"她慢慢走到窗边，手指在玻璃上划过，沉默了很久"可浓缩为"她走到窗边，沉默了一会儿"。
-5. 删除以下技术噪音：系统提示、玩家指令、URL、代码块、角色名标签、楼层信息、表情包、纯括号动作说明（他笑了一下）（她点点头）。
-6. 保留称呼、口癖、错字和标点风格；保留句子间正常感叹（呀、呢、吧、嘛等句尾语气助词）。
-7. 删除或转换纯呻吟/娇喘/浪叫/喘息类拟声词（如：嗯～、啊～、哈啊、咕齁、咿咿、嗯嗯啊啊等成片无语义的叫声），改用简洁自然的拟声词（嗯、啊、唔、吧、哈）重构为真实娇喘效果，例如"嗯❤️～哈啊～"转为"嗯……啊……唔……"。不要用括号标注代替，要 MiMo 真实读出娇喘声音。
-8. 删除中文句子中间的 emoji（❤️♡～等）和非文字符号。
-9. 细粒度控制语气、情绪、语速、停顿和呼吸，减少干巴巴逐句朗读的感觉；可加入轻微迟疑、笑意、叹气、呼吸、停顿、尾音变化和潜台词情绪，但每 1~3 句最多插入 1 个关键标注。
-10. 如果没有任何可朗读文本，只输出：<EMPTY>。
-
-风格样例（叙述被浓缩，对白完整保留）：
-她走到窗边，沉默了一会儿。"你……真的要走吗？"她的声音有些颤抖。
-（意乱情迷的喘息）嗯……啊……主人……唔……（满足的轻哼）哈啊……好舒服……
-（极其疲惫，有气无力）师傅……到地方了叫我一声……（长叹一口气）我先眯一会儿，这班加得我魂儿都要散了。
-如果我当时……（沉默片刻）哪怕再坚持一秒钟，结果是不是就不一样了？（苦笑）呵，没如果了。
-（寒冷导致的急促呼吸）呼——呼——这、这大兴安岭的雪……（咳嗽）简直能把人骨头冻透了……别、别停下，走，快走。`,
         preprocessPromptKeep: `你是 SillyTavern 角色对白的 TTS 表演脚本整理器。你的任务是把输入段落整理成适合 MiMo TTS 朗读的中文表演文本。
 
 规则：
@@ -284,9 +264,8 @@ class MimoTtsProvider {
                         </label>
                         <label for="mimo_tts_preprocess_narrative_mode">正文叙述处理</label>
                         <select id="mimo_tts_preprocess_narrative_mode" class="text_pole">
-                            <option value="remove">完整删除（只留对白）</option>
-                            <option value="condense">浓缩保留（一句衔接）</option>
-                            <option value="keep">全部保留（原文输出）</option>
+                            <option value="remove">删除叙述（只留对白）</option>
+                            <option value="keep">保留叙述（原文输出）</option>
                         </select>
                         <label for="mimo_tts_preprocess_custom_style">自定义风格补充</label>
                         <textarea id="mimo_tts_preprocess_custom_style" class="text_pole" rows="4" placeholder="例如：更傲娇一点，句尾带一点不服气；亲密场景用更轻的气声；战斗场景不要夸张喊叫。"></textarea>
@@ -1110,7 +1089,7 @@ class MimoTtsProvider {
         }
 
         const narrativeMode = this.settings.preprocessNarrativeMode || 'remove';
-        const promptLabel = narrativeMode === 'condense' ? '浓缩保留' : narrativeMode === 'keep' ? '全部保留' : '完整删除';
+        const promptLabel = narrativeMode === 'keep' ? '保留叙述' : '删除叙述';
         const effectivePrompt = this.getEffectivePreprocessPrompt();
         const promptPreview = effectivePrompt ? effectivePrompt.replace(/\n/g, ' ').slice(0, 200) : '';
 
@@ -1319,7 +1298,6 @@ class MimoTtsProvider {
             preprocessNarrativeMode: this.settings.preprocessNarrativeMode,
             preprocessCustomStyle: this.settings.preprocessCustomStyle,
             preprocessPrompt: this.settings.preprocessPrompt,
-            preprocessPromptCondense: this.settings.preprocessPromptCondense,
             preprocessPromptKeep: this.settings.preprocessPromptKeep,
             backgroundAudioEnabled: this.settings.backgroundAudioEnabled,
             backgroundSceneId: preparedText?.scene || 'other',
@@ -1820,10 +1798,6 @@ class MimoTtsProvider {
 
     getEffectivePreprocessPrompt() {
         const mode = this.settings.preprocessNarrativeMode || 'remove';
-
-        if (mode === 'condense') {
-            return this.settings.preprocessPromptCondense || this.defaultSettings.preprocessPromptCondense;
-        }
 
         if (mode === 'keep') {
             return this.settings.preprocessPromptKeep || this.defaultSettings.preprocessPromptKeep;
