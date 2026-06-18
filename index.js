@@ -423,11 +423,26 @@ class MimoTtsProvider {
     }
 
     bindDrawerFallback() {
-        $('#mimo_tts_extension_settings .inline-drawer-toggle').off('click.mimoAdvancedDrawer').on('click.mimoAdvancedDrawer', () => {
-            const content = $('#mimo_tts_extension_settings .inline-drawer-content');
-            const icon = $('#mimo_tts_extension_settings .inline-drawer-icon');
-            content.slideToggle(120);
-            icon.toggleClass('down up');
+        const root = document.querySelector('#mimo_tts_extension_settings');
+        const toggle = root?.querySelector('.inline-drawer-toggle');
+        const content = root?.querySelector('.inline-drawer-content');
+        const icon = root?.querySelector('.inline-drawer-icon');
+
+        if (!toggle || !content || toggle.dataset.mimoAdvancedDrawerBound === '1') {
+            return;
+        }
+
+        toggle.dataset.mimoAdvancedDrawerBound = '1';
+        toggle.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+            const contentElement = $(content);
+            const isVisible = contentElement.is(':visible');
+            contentElement.stop(true, true)[isVisible ? 'slideUp' : 'slideDown'](120);
+            icon?.classList.toggle('down', isVisible);
+            icon?.classList.toggle('up', !isVisible);
         });
     }
 
