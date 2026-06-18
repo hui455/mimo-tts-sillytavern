@@ -1125,6 +1125,7 @@ class MimoTtsProvider {
             .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, '')
             .replace(/<reasoning\b[^>]*>[\s\S]*?<\/reasoning>/gi, '')
             .replace(/<analysis\b[^>]*>[\s\S]*?<\/analysis>/gi, '')
+            .replace(/<think[^>]*>[\s\S]*?<\/div>/gi, '')
             .replace(/\[think\][\s\S]*?\[\/think\]/gi, '')
             .replace(/\[thinking\][\s\S]*?\[\/thinking\]/gi, '')
             .replace(/\[reasoning\][\s\S]*?\[\/reasoning\]/gi, '')
@@ -2051,10 +2052,13 @@ class MimoTtsProvider {
             return 'other';
         }
 
-        const enabledScenes = (this.settings.backgroundScenes || []).filter((scene) => scene.enabled !== false && scene.audioDataUrl);
+        const enabledScenes = (this.settings.backgroundScenes || []).filter((scene) => scene.enabled !== false);
         if (!enabledScenes.length) {
             return 'other';
         }
+
+        const cleaned = this.cleanMessageText(inputText);
+        const snippet = cleaned.length > 2000 ? cleaned.slice(-2000) : cleaned;
 
         const sceneList = enabledScenes.map((scene) => `- ${scene.id}（${scene.name}）：${scene.description}`).join('\n');
 
@@ -2078,7 +2082,7 @@ ${sceneList}
 
 规则：只输出场景ID（如 kiss、ear、oral、sex、other），不要解释，不要其他任何内容。`,
                         },
-                        { role: 'user', content: String(inputText || '').slice(0, 2000) },
+                        { role: 'user', content: snippet },
                     ],
                 }),
             }, 15000);
