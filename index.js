@@ -872,8 +872,11 @@ class MimoTtsProvider {
         }
 
         preparedSpeech.text = preparedSpeech.text
-            .replace(/([。！？])\s*/g, '$1（停顿片刻）')
-            .replace(/（停顿片刻）\s*（停顿片刻）/g, '（停顿片刻）');
+            .replace(/\n\n+/g, '\n（沉默片刻）\n')
+            .replace(/([。！？.!?])\s*/g, '$1\n（停顿片刻）\n')
+            .replace(/\n（停顿片刻）\n\s*\n（停顿片刻）\n/g, '\n（停顿片刻）\n')
+            .replace(/\n（停顿片刻）\n\s*\n（沉默片刻）\n/g, '\n（沉默片刻）\n')
+            .replace(/\n（沉默片刻）\n\s*\n（停顿片刻）\n/g, '\n（沉默片刻）\n');
 
         const response = await this.fetchTtsGeneration(preparedSpeech.text, voice, preparedSpeech);
         let audioBlob = await response.blob();
