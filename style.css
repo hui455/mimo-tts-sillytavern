@@ -1,0 +1,32 @@
+.mimo-tts-provider-settings {
+  display: grid;
+  gap: 10px;
+}
+
+.mimo-tts-provider-settings h4 {
+  margin: 4px 0;
+}
+
+.mimo-tts-provider-settings textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.mimo-tts-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.mimo-tts-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.mimo-tts-list-item span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
