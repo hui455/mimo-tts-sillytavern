@@ -27,8 +27,6 @@ class MimoTtsProvider {
         instruction: '自然、清晰、口语化，情绪贴合文本内容。',
         independentMessageButtons: true,
         independentVoiceId: 'preset:冰糖',
-        dualSpeakerEnabled: true,
-        secondVoiceId: 'design:sweet-teen-girl',
         independentCacheEnabled: true,
         independentCacheLimit: 5,
         debugLogEnabled: true,
@@ -39,6 +37,7 @@ class MimoTtsProvider {
         preprocessModel: 'deepseek-chat',
         preprocessTemperature: 0.2,
         preprocessFallbackToOriginal: true,
+        preprocessKeepInnerMonologue: true,
         preprocessStyle: 'natural-dialogue',
         preprocessCustomStyle: '',
         preprocessPrompt: `你是 SillyTavern 角色对白的 TTS 表演脚本整理器。你的任务是把输入段落整理成适合 MiMo TTS 朗读的中文表演文本。
@@ -233,12 +232,6 @@ class MimoTtsProvider {
                         </label>
                         <label for="mimo_tts_independent_voice">独立播放音色</label>
                         <select id="mimo_tts_independent_voice" class="text_pole"></select>
-                        <label>
-                            <input id="mimo_tts_dual_speaker_enabled" type="checkbox">
-                            检测到双人对话时使用第二人音色
-                        </label>
-                        <label for="mimo_tts_second_voice">第二人音色</label>
-                        <select id="mimo_tts_second_voice" class="text_pole"></select>
                         <label for="mimo_tts_preview_text">试音文本</label>
                         <textarea id="mimo_tts_preview_text" class="text_pole" rows="3"></textarea>
                         <input id="mimo_tts_preview_selected_voice" type="button" class="menu_button" value="试听当前独立播放音色">
@@ -276,6 +269,10 @@ class MimoTtsProvider {
                         <input id="mimo_tts_preprocess_temperature" type="range" min="0" max="1" step="0.05">
                         <label for="mimo_tts_preprocess_style">表演风格预设</label>
                         <select id="mimo_tts_preprocess_style" class="text_pole"></select>
+                        <label>
+                            <input id="mimo_tts_preprocess_keep_inner_monologue" type="checkbox">
+                            保留心理活动和内心独白
+                        </label>
                         <label for="mimo_tts_preprocess_custom_style">自定义风格补充</label>
                         <textarea id="mimo_tts_preprocess_custom_style" class="text_pole" rows="4" placeholder="例如：更傲娇一点，句尾带一点不服气；亲密场景用更轻的气声；战斗场景不要夸张喊叫。"></textarea>
                         <label>
@@ -391,9 +388,6 @@ class MimoTtsProvider {
             this.settings.independentVoiceId = this.defaultSettings.independentVoiceId;
         }
 
-        if (removedVoiceIds.has(this.settings.secondVoiceId)) {
-            this.settings.secondVoiceId = this.defaultSettings.secondVoiceId;
-        }
     }
 
     async loadSettings(settings) {
@@ -447,9 +441,6 @@ class MimoTtsProvider {
         $('#mimo_tts_independent_buttons').prop('checked', Boolean(this.settings.independentMessageButtons));
         this.renderIndependentVoiceSelect();
         $('#mimo_tts_independent_voice').val(this.settings.independentVoiceId);
-        $('#mimo_tts_dual_speaker_enabled').prop('checked', Boolean(this.settings.dualSpeakerEnabled));
-        this.renderSecondVoiceSelect();
-        $('#mimo_tts_second_voice').val(this.settings.secondVoiceId);
         $('#mimo_tts_preview_text').val(this.settings.previewText);
         $('#mimo_tts_debug_log_enabled').prop('checked', Boolean(this.settings.debugLogEnabled));
         $('#mimo_tts_independent_cache').prop('checked', Boolean(this.settings.independentCacheEnabled));
@@ -461,6 +452,7 @@ class MimoTtsProvider {
         $('#mimo_tts_preprocess_temperature_output').text(Number(this.settings.preprocessTemperature).toFixed(2));
         this.renderStylePresetSelect();
         $('#mimo_tts_preprocess_style').val(this.settings.preprocessStyle);
+        $('#mimo_tts_preprocess_keep_inner_monologue').prop('checked', Boolean(this.settings.preprocessKeepInnerMonologue));
         $('#mimo_tts_preprocess_custom_style').val(this.settings.preprocessCustomStyle);
         $('#mimo_tts_preprocess_fallback').prop('checked', Boolean(this.settings.preprocessFallbackToOriginal));
         $('#mimo_tts_preprocess_prompt').val(this.settings.preprocessPrompt);
@@ -471,7 +463,7 @@ class MimoTtsProvider {
         $('#mimo_tts_preprocess_api_key, #mimo_tts_preprocess_base_url, #mimo_tts_preprocess_model, #mimo_tts_preprocess_prompt').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_custom_style').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_temperature').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
-        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_dual_speaker_enabled, #mimo_tts_second_voice, #mimo_tts_independent_cache, #mimo_tts_debug_log_enabled, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_style').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_independent_cache, #mimo_tts_debug_log_enabled, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_style, #mimo_tts_preprocess_keep_inner_monologue').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_independent_stop').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.stopIndependentAudio());
         $('#mimo_tts_clear_cache').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearAudioCacheWithToast());
         $('#mimo_tts_clear_debug_log').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearDebugLog());
@@ -518,8 +510,6 @@ class MimoTtsProvider {
         this.settings.optimizeTextPreview = Boolean($('#mimo_tts_optimize_text_preview').is(':checked'));
         this.settings.independentMessageButtons = Boolean($('#mimo_tts_independent_buttons').is(':checked'));
         this.settings.independentVoiceId = String($('#mimo_tts_independent_voice').val() || this.settings.independentVoiceId || 'preset:冰糖');
-        this.settings.dualSpeakerEnabled = Boolean($('#mimo_tts_dual_speaker_enabled').is(':checked'));
-        this.settings.secondVoiceId = String($('#mimo_tts_second_voice').val() || this.settings.secondVoiceId || this.settings.independentVoiceId);
         this.settings.independentCacheEnabled = Boolean($('#mimo_tts_independent_cache').is(':checked'));
         this.settings.debugLogEnabled = Boolean($('#mimo_tts_debug_log_enabled').is(':checked'));
         this.settings.previewText = String($('#mimo_tts_preview_text').val() || '').trim() || this.defaultSettings.previewText;
@@ -529,6 +519,7 @@ class MimoTtsProvider {
         this.settings.preprocessModel = String($('#mimo_tts_preprocess_model').val() || '').trim();
         this.settings.preprocessTemperature = Number($('#mimo_tts_preprocess_temperature').val() || 0.2);
         this.settings.preprocessStyle = String($('#mimo_tts_preprocess_style').val() || 'natural-dialogue');
+        this.settings.preprocessKeepInnerMonologue = Boolean($('#mimo_tts_preprocess_keep_inner_monologue').is(':checked'));
         this.settings.preprocessCustomStyle = String($('#mimo_tts_preprocess_custom_style').val() || '').trim();
         this.settings.preprocessFallbackToOriginal = Boolean($('#mimo_tts_preprocess_fallback').is(':checked'));
         this.settings.preprocessPrompt = String($('#mimo_tts_preprocess_prompt').val() || '').trim();
@@ -681,30 +672,22 @@ class MimoTtsProvider {
 
         try {
             const voice = await this.getIndependentVoice();
-            const secondVoice = await this.getSecondVoice();
-            const dialogueSegments = this.parseDualSpeakerSegments(text);
-            const results = dialogueSegments && this.settings.dualSpeakerEnabled
-                ? await this.getOrCreateDialogueAudio(dialogueSegments, voice, secondVoice)
-                : [await this.getOrCreateAudioBlob(text, voice)];
+            const preparedFullText = await this.preprocessText(text, voice);
+            if (!preparedFullText) {
+                throw new Error('DeepSeek 预处理后没有可朗读对白。');
+            }
+
+            const results = [await this.getOrCreateAudioBlob(text, voice, preparedFullText)];
             const cacheHit = results.every((result) => result.cacheHit);
             const blobs = results.map((result) => result.blob);
 
             this.writeDebugLog({
-                title: dialogueSegments && this.settings.dualSpeakerEnabled ? '独立播放 - 双人分段' : '独立播放',
+                title: '独立播放',
                 originalText: text,
-                processedText: results.map((result, index) => {
-                    const segment = dialogueSegments?.[index];
-                    const prefix = segment ? `${segment.speaker}: ` : '';
-                    return `${prefix}${result.processedText}`;
-                }).join('\n'),
+                processedText: preparedFullText,
                 cacheHit,
-                voiceName: dialogueSegments && this.settings.dualSpeakerEnabled
-                    ? `${voice.name} / ${secondVoice.name}`
-                    : voice.name,
-                voiceId: dialogueSegments && this.settings.dualSpeakerEnabled
-                    ? `${voice.voice_id} / ${secondVoice.voice_id}`
-                    : voice.voice_id,
-                dualSpeaker: Boolean(dialogueSegments && this.settings.dualSpeakerEnabled),
+                voiceName: voice.name,
+                voiceId: voice.voice_id,
             });
             this.setButtonState(button, cacheHit ? 'cached' : 'ready');
             if (cacheHit) {
@@ -763,14 +746,14 @@ class MimoTtsProvider {
         return this.cleanMessageText(clone.innerText || clone.textContent || '');
     }
 
-    async getOrCreateAudioBlob(inputText, voice) {
+    async getOrCreateAudioBlob(inputText, voice, preparedTextOverride = null) {
         const cleanInputText = this.cleanMessageText(inputText);
 
         if (!cleanInputText) {
             throw new Error('没有可朗读文本。');
         }
 
-        const cacheKey = await this.buildAudioCacheKey(cleanInputText, voice);
+        const cacheKey = await this.buildAudioCacheKey(cleanInputText, voice, preparedTextOverride);
 
         if (this.settings.independentCacheEnabled) {
             const cachedEntry = await this.readAudioCache(cacheKey);
@@ -784,7 +767,7 @@ class MimoTtsProvider {
             }
         }
 
-        const preparedText = await this.preprocessText(cleanInputText, voice);
+        const preparedText = preparedTextOverride ?? await this.preprocessText(cleanInputText, voice);
         if (!preparedText) {
             throw new Error('DeepSeek 预处理后没有可朗读对白。');
         }
@@ -828,79 +811,6 @@ class MimoTtsProvider {
         throw new Error('没有可用的 MiMo 音色。');
     }
 
-    async getSecondVoice() {
-        const voices = await this.fetchTtsVoiceObjects();
-        const selected = voices.find((voice) => voice.voice_id === this.settings.secondVoiceId || voice.name === this.settings.secondVoiceId);
-
-        if (selected) {
-            return selected;
-        }
-
-        const fallback = voices.find((voice) => voice.voice_id !== this.settings.independentVoiceId) || voices[0];
-        if (fallback) {
-            this.settings.secondVoiceId = fallback.voice_id;
-            return fallback;
-        }
-
-        throw new Error('没有可用的第二人音色。');
-    }
-
-    parseDualSpeakerSegments(text) {
-        const lines = String(text || '').split(/\n+/);
-        const segments = [];
-        const speakers = [];
-
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) {
-                continue;
-            }
-
-            const match = trimmed.match(/^([^:：\n]{1,20})[:：]\s*(.+)$/);
-            if (!match) {
-                if (segments.length) {
-                    segments[segments.length - 1].text += `\n${trimmed}`;
-                }
-                continue;
-            }
-
-            const speaker = match[1].trim();
-            const content = match[2].trim();
-            if (!content) {
-                continue;
-            }
-
-            if (!speakers.includes(speaker) && speakers.length < 2) {
-                speakers.push(speaker);
-            }
-
-            if (!speakers.includes(speaker)) {
-                segments.push({ speaker, speakerIndex: 0, text: content });
-                continue;
-            }
-
-            segments.push({
-                speaker,
-                speakerIndex: speakers.indexOf(speaker),
-                text: content,
-            });
-        }
-
-        const uniqueSpeakers = new Set(segments.map((segment) => segment.speakerIndex));
-        return uniqueSpeakers.size >= 2 ? segments : null;
-    }
-
-    async getOrCreateDialogueAudio(segments, primaryVoice, secondVoice) {
-        const results = [];
-
-        for (const segment of segments) {
-            const voice = segment.speakerIndex === 0 ? primaryVoice : secondVoice;
-            results.push(await this.getOrCreateAudioBlob(segment.text, voice));
-        }
-
-        return results;
-    }
-
     async previewSelectedIndependentVoice() {
         const voice = await this.getIndependentVoice();
         await this.previewVoiceObject(voice);
@@ -917,7 +827,6 @@ class MimoTtsProvider {
             cacheHit: false,
             voiceName: voice.name,
             voiceId: voice.voice_id,
-            dualSpeaker: false,
         });
         await this.playIndependentBlob(audioBlob);
     }
@@ -980,7 +889,6 @@ class MimoTtsProvider {
             `类型：${entry.title || '播放'}`,
             `音色：${entry.voiceName || ''} (${entry.voiceId || ''})`,
             `缓存：${entry.cacheHit ? '命中' : '未命中'}`,
-            `双人：${entry.dualSpeaker ? '是' : '否'}`,
             '原文：',
             entry.originalText || '',
             '处理后：',
@@ -1102,10 +1010,11 @@ class MimoTtsProvider {
             .replace(/(?:^|\n)\s*(?:思考|思考过程|推理过程|内心推理|thinking|reasoning)\s*[:：][\s\S]*?(?=\n\s*(?:正文|回复|最终回复|assistant|角色回复)\s*[:：]|\n{2,}|$)/gi, '\n');
     }
 
-    async buildAudioCacheKey(inputText, voice) {
+    async buildAudioCacheKey(inputText, voice, preparedText = null) {
         const material = JSON.stringify({
-            version: 8,
+            version: 10,
             inputText,
+            preparedText,
             voice,
             baseUrl: this.normalizeBaseUrl(this.settings.baseUrl),
             presetModel: this.settings.presetModel,
@@ -1118,6 +1027,7 @@ class MimoTtsProvider {
             preprocessModel: this.settings.preprocessModel,
             preprocessTemperature: this.settings.preprocessTemperature,
             preprocessStyle: this.settings.preprocessStyle,
+            preprocessKeepInnerMonologue: this.settings.preprocessKeepInnerMonologue,
             preprocessCustomStyle: this.settings.preprocessCustomStyle,
             preprocessPrompt: this.settings.preprocessPrompt,
         });
@@ -1370,6 +1280,7 @@ class MimoTtsProvider {
                         content: [
                             this.settings.preprocessPrompt || this.defaultSettings.preprocessPrompt,
                             this.buildStyleInstruction(),
+                            this.buildInnerMonologueInstruction(),
                         ].filter(Boolean).join('\n\n'),
                     },
                     {
@@ -1417,44 +1328,6 @@ class MimoTtsProvider {
             .trim();
     }
 
-    isConservativePreprocessOutput(inputText, outputText) {
-        return this.validateConservativePreprocessOutput(inputText, outputText).ok;
-    }
-
-    validateConservativePreprocessOutput(inputText, outputText) {
-        const input = this.normalizeConservativeCompareText(inputText);
-        const outputWithoutControls = this.normalizeConservativeCompareText(
-            String(outputText || '')
-                .replace(/（[^）]*）/g, '')
-                .replace(/\([^)]*\)/g, '')
-                .replace(/\[[^\]]*]/g, ''),
-        );
-
-        if (!outputWithoutControls) {
-            return { ok: false, reason: 'empty_output_after_removing_control_tags', input, outputWithoutControls };
-        }
-
-        let cursor = 0;
-        for (const char of outputWithoutControls) {
-            cursor = input.indexOf(char, cursor);
-            if (cursor === -1) {
-                return { ok: false, reason: 'output_char_not_found_in_input_order', missingChar: char, input, outputWithoutControls };
-            }
-            cursor += char.length;
-        }
-
-        return { ok: true, input, outputWithoutControls };
-    }
-
-    normalizeConservativeCompareText(text) {
-        return String(text || '')
-            .replace(/\s+/g, '')
-            .replace(/[“”「」『』《》〈〉""'`]/g, '')
-            .replace(/[，。！？、；：,.!?;:]/g, '')
-            .replace(/[…⋯·・~～\-—–―_＿|｜\\/]/g, '')
-            .trim();
-    }
-
     showThrottledPreprocessWarning(message) {
         const now = Date.now();
         if (now - this.lastPreprocessWarningAt < 10000) {
@@ -1498,6 +1371,14 @@ class MimoTtsProvider {
         }
 
         return lines.join('\n');
+    }
+
+    buildInnerMonologueInstruction() {
+        if (this.settings.preprocessKeepInnerMonologue) {
+            return '保留心理活动、内心独白和角色心声；可以把它们整理成可朗读文本，并用括号标注情绪或小声独白。不要把 <think>、reasoning、系统推理内容当成角色心理活动。';
+        }
+
+        return '去除心理活动和内心独白，只保留真正说出口的对白、喊话、低语、吐槽和拟声词。';
     }
 
     getStylePreset(id) {
@@ -1830,7 +1711,6 @@ class MimoTtsProvider {
         this.renderVoiceList('#mimo_tts_design_voice_list', 'designedVoices');
         this.renderVoiceList('#mimo_tts_clone_voice_list', 'clonedVoices');
         this.renderIndependentVoiceSelect();
-        this.renderSecondVoiceSelect();
     }
 
     renderStylePresetSelect() {
@@ -1861,32 +1741,6 @@ class MimoTtsProvider {
             select.val(currentValue);
         } else if (voices[0]) {
             this.settings.independentVoiceId = voices[0].voice_id;
-            select.val(voices[0].voice_id);
-        }
-    }
-
-    renderSecondVoiceSelect() {
-        const select = $('#mimo_tts_second_voice');
-
-        if (!select.length) {
-            return;
-        }
-
-        const currentValue = this.settings.secondVoiceId;
-        const voices = this.getAllConfiguredVoices();
-        select.empty();
-
-        for (const voice of voices) {
-            select.append($('<option></option>').val(voice.voice_id).text(voice.name));
-        }
-
-        if (voices.some((voice) => voice.voice_id === currentValue)) {
-            select.val(currentValue);
-        } else if (voices[1]) {
-            this.settings.secondVoiceId = voices[1].voice_id;
-            select.val(voices[1].voice_id);
-        } else if (voices[0]) {
-            this.settings.secondVoiceId = voices[0].voice_id;
             select.val(voices[0].voice_id);
         }
     }
