@@ -1376,7 +1376,7 @@ class MimoTtsProvider {
     }
 
     async preprocessSpeech(inputText, voice) {
-        const matchedScene = this.matchSceneByKeywords(inputText);
+        const matchedScene = await this.classifyScene(inputText);
 
         if (!this.settings.preprocessEnabled) {
             const result = this.normalizePreparedSpeech(inputText, inputText);
@@ -2046,24 +2046,63 @@ class MimoTtsProvider {
         return slug || `voice-${Date.now()}`;
     }
 
-    matchSceneByKeywords(inputText) {
-        if (!this.settings.backgroundAudioEnabled) {
+    async classifyScene(inputText) {
+        if (!this.settings.backgroundAudioEnabled || !this.settings.preprocessApiKey) {
             return 'other';
         }
 
-        const text = String(inputText || '').toLowerCase();
-        const enabledScenes = (this.settings.backgroundScenes || []).filter((scene) => scene.enabled !== false && scene.description);
-
-        for (const scene of enabledScenes) {
-            const keywords = scene.description.split(/[,，、\s]+/).filter(Boolean);
-            for (const keyword of keywords) {
-                if (keyword && text.includes(keyword.toLowerCase())) {
-                    return scene.id;
-                }
-            }
+        const enabledScenes = (this.settings.backgroundScenes || []).filter((scene) => scene.enabled !== false && scene.audioDataUrl);
+        if (!enabledScenes.length) {
+            return 'other';
         }
 
-        return 'other';
+        const sceneList = enabledScenes.map((scene) => `- ${scene.id}（${scene.name}）：${scene.description}`).join('\n');
+
+        try {
+            const response = await this.fetchWithTimeout(`${this.normalizeBaseUrl(this.settings.preprocessBaseUrl)}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.settings.preprocessApiKey}`,
+                },
+                body: JSON.stringify({
+                    model: this.settings.preprocessModel || this.defaultSettings.preprocessModel,
+                    temperature: 0,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: `你是场景分类器。根据消息内容判断场景，只返回场景ID。
+场景列表：
+${sceneList}
+- other：其他场景或不相关
+
+规则：只输出场景ID（如 kiss、ear、oral、sex、other），不要解释，不要其他任何内容。`,
+                        },
+                        { role: 'user', content: String(inputText || '').slice(0, 2000) },
+                    ],
+                }),
+            }, 15000);
+
+            const raw = await response.text();
+            let payload = {};
+
+            try {
+                payload = raw ? JSON.parse(raw) : {};
+            } catch {
+                payload = { raw };
+            }
+
+            if (!response.ok) {
+                throw new Error(`Scene classification HTTP ${response.status}`);
+            }
+
+            const content = String(payload?.choices?.[0]?.message?.content || '').trim().toLowerCase();
+            const validIds = new Set([...enabledScenes.map((s) => s.id), 'other']);
+            return validIds.has(content) ? content : 'other';
+        } catch (error) {
+            console.warn('MiMo Advanced scene classification failed', error);
+            return 'other';
+        }
     }
 
     getBackgroundScene(sceneId) {
