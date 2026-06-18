@@ -30,7 +30,7 @@ class MimoTtsProvider {
         independentMessageButtons: true,
         independentVoiceId: 'preset:冰糖',
         independentCacheEnabled: true,
-        independentCacheLimit: 5,
+        independentCacheLimit: 20,
         debugLogEnabled: true,
         previewText: '你好，这是 MiMo Advanced 的音色试听。今天也辛苦了，先放松一下吧。',
         preprocessEnabled: false,
@@ -195,7 +195,7 @@ class MimoTtsProvider {
                         <input id="mimo_tts_preview_selected_voice" type="button" class="menu_button" value="试听当前独立播放音色">
                         <label>
                             <input id="mimo_tts_independent_cache" type="checkbox">
-                            自动缓存最近 5 条语音
+                            自动缓存最近 20 条语音
                         </label>
                         <input id="mimo_tts_clear_cache" type="button" class="menu_button" value="清空插件语音缓存">
                         <input id="mimo_tts_independent_stop" type="button" class="menu_button" value="停止独立播放">
@@ -1325,7 +1325,7 @@ class MimoTtsProvider {
         const entries = await this.getAudioCacheEntries();
         const overflow = entries
             .sort((left, right) => right.createdAt - left.createdAt)
-            .slice(Number(this.settings.independentCacheLimit) || 5);
+            .slice(Number(this.settings.independentCacheLimit) || 20);
 
         if (!overflow.length) {
             return;

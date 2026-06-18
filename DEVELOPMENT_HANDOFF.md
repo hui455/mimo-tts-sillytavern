@@ -18,7 +18,7 @@
 - 不依赖 SillyTavern 系统 TTS 设置，系统 TTS Provider/语速/队列设置不应影响独立播放。
 - DeepSeek 可在朗读前预处理整条消息，一次处理完整文本，不按人物/段落拆分。
 - DeepSeek 预处理只临时用于本次 TTS，不修改原聊天消息。
-- 生成音频由插件浏览器 IndexedDB 缓存，默认最近 5 条。
+- 生成音频由插件浏览器 IndexedDB 缓存，默认最近 20 条。
 - 当前只保留 MiMo 预置音色和声音克隆，已移除文本设计音色。
 
 ## 主要文件
@@ -137,7 +137,7 @@
 
 - 使用浏览器 IndexedDB：`mimo-advanced-tts-cache`
 - object store：`audio`
-- 默认缓存最近 5 条，由 `independentCacheLimit` 控制。
+- 默认缓存最近 20 条，由 `independentCacheLimit` 控制。
 - 缓存 key 当前版本：`version: 16`
 - 缓存 key 包含：
   - 输入文本
