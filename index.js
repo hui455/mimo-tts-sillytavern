@@ -1109,18 +1109,31 @@ class MimoTtsProvider {
             return;
         }
 
+        const narrativeMode = this.settings.preprocessNarrativeMode || 'remove';
+        const promptLabel = narrativeMode === 'condense' ? '浓缩保留' : narrativeMode === 'keep' ? '全部保留' : '完整删除';
+        const effectivePrompt = this.getEffectivePreprocessPrompt();
+        const promptPreview = effectivePrompt ? effectivePrompt.replace(/\n/g, ' ').slice(0, 200) : '';
+
         const lines = [
             `时间：${new Date().toLocaleString()}`,
             `类型：${entry.title || '播放'}`,
             `音色：${entry.voiceName || ''} (${entry.voiceId || ''})`,
             `场景：${entry.scene || '无'}`,
             `缓存：${entry.cacheHit ? '命中' : '未命中'}`,
-            `叙述模式：${this.settings.preprocessNarrativeMode || 'remove'}`,
+            `=== 预处理配置 ===`,
+            `DeepSeek模型：${this.settings.preprocessModel || 'deepseek-chat'}`,
+            `Temperature：${this.settings.preprocessTemperature}`,
+            `提示词版本：${promptLabel}`,
+            `风格预设：${this.getStylePreset(this.settings.preprocessStyle)?.name || '无'}`,
+            `内心独白：${this.settings.preprocessKeepInnerMonologue ? '保留' : '删除'}`,
             `控制模式：${this.getPreprocessControlModeLabel(this.getPreprocessControlMode())}`,
+            `自定义风格：${this.settings.preprocessCustomStyle || '无'}`,
+            `=== 运行时状态 ===`,
             `预处理：${this.settings.preprocessEnabled ? '启用' : '关闭'}`,
             `背景声：${this.settings.backgroundAudioEnabled ? '启用' : '关闭'}`,
             `原文长度：${entry.originalText ? entry.originalText.length : 0} 字`,
             `处理后长度：${entry.processedText ? entry.processedText.length : 0} 字`,
+            `系统提示词前200字：${promptPreview}`,
             '原文：',
             entry.originalText || '',
             '处理后：',
