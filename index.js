@@ -870,16 +870,14 @@ class MimoTtsProvider {
             throw new Error('DeepSeek 预处理后没有可朗读对白。');
         }
 
-        const scene = preparedSpeech?.scene;
-        if (this.settings.backgroundAudioEnabled && scene && scene !== 'other') {
-            preparedSpeech.text = preparedSpeech.text
-                .replace(/([。！？])\s*/g, '$1（停顿片刻）')
-                .replace(/（停顿片刻）\s*（停顿片刻）/g, '（停顿片刻）');
-        }
+        preparedSpeech.text = preparedSpeech.text
+            .replace(/([。！？])\s*/g, '$1（停顿片刻）')
+            .replace(/（停顿片刻）\s*（停顿片刻）/g, '（停顿片刻）');
 
         const response = await this.fetchTtsGeneration(preparedSpeech.text, voice, preparedSpeech);
         let audioBlob = await response.blob();
 
+        const scene = preparedSpeech?.scene;
         if (this.settings.backgroundAudioEnabled && scene) {
             audioBlob = await this.mixAudioWithBackground(audioBlob, scene);
         }
