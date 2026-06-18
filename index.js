@@ -9,6 +9,7 @@ class MimoTtsProvider {
     independentAudioElement = document.createElement('audio');
     independentObjectUrl = null;
     messageObserver = null;
+    cacheDbPromise = null;
 
     defaultSettings = {
         apiKey: '',
@@ -20,6 +21,8 @@ class MimoTtsProvider {
         instruction: '自然、清晰、口语化，情绪贴合文本内容。',
         independentMessageButtons: true,
         independentVoiceId: 'preset:冰糖',
+        independentCacheEnabled: true,
+        independentCacheLimit: 5,
         preprocessEnabled: false,
         preprocessApiKey: '',
         preprocessBaseUrl: 'https://api.deepseek.com',
@@ -159,6 +162,11 @@ class MimoTtsProvider {
                 </label>
                 <label for="mimo_tts_independent_voice">独立播放音色</label>
                 <select id="mimo_tts_independent_voice" class="text_pole"></select>
+                <label>
+                    <input id="mimo_tts_independent_cache" type="checkbox">
+                    自动缓存最近 5 条语音
+                </label>
+                <input id="mimo_tts_clear_cache" type="button" class="menu_button" value="清空插件语音缓存">
                 <input id="mimo_tts_independent_stop" type="button" class="menu_button" value="停止独立播放">
             </div>
             <hr>
@@ -228,6 +236,7 @@ class MimoTtsProvider {
         $('#mimo_tts_independent_buttons').prop('checked', Boolean(this.settings.independentMessageButtons));
         this.renderIndependentVoiceSelect();
         $('#mimo_tts_independent_voice').val(this.settings.independentVoiceId);
+        $('#mimo_tts_independent_cache').prop('checked', Boolean(this.settings.independentCacheEnabled));
         $('#mimo_tts_preprocess_enabled').prop('checked', Boolean(this.settings.preprocessEnabled));
         $('#mimo_tts_preprocess_api_key').val(this.settings.preprocessApiKey);
         $('#mimo_tts_preprocess_base_url').val(this.settings.preprocessBaseUrl);
@@ -244,8 +253,9 @@ class MimoTtsProvider {
         $('#mimo_tts_preprocess_api_key, #mimo_tts_preprocess_base_url, #mimo_tts_preprocess_model, #mimo_tts_preprocess_prompt').on('input', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_custom_style').on('input', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_temperature').on('input', () => this.onSettingsChange());
-        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_style').on('change', () => this.onSettingsChange());
+        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_independent_cache, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_style').on('change', () => this.onSettingsChange());
         $('#mimo_tts_independent_stop').on('click', () => this.stopIndependentAudio());
+        $('#mimo_tts_clear_cache').on('click', () => this.clearAudioCacheWithToast());
         $('#mimo_tts_add_preset_voice').on('click', () => this.addPresetVoice());
         $('#mimo_tts_add_design_voice').on('click', () => this.addDesignedVoice());
 
@@ -272,6 +282,7 @@ class MimoTtsProvider {
         this.settings.optimizeTextPreview = Boolean($('#mimo_tts_optimize_text_preview').is(':checked'));
         this.settings.independentMessageButtons = Boolean($('#mimo_tts_independent_buttons').is(':checked'));
         this.settings.independentVoiceId = String($('#mimo_tts_independent_voice').val() || this.settings.independentVoiceId || 'preset:冰糖');
+        this.settings.independentCacheEnabled = Boolean($('#mimo_tts_independent_cache').is(':checked'));
         this.settings.preprocessEnabled = Boolean($('#mimo_tts_preprocess_enabled').is(':checked'));
         this.settings.preprocessApiKey = String($('#mimo_tts_preprocess_api_key').val() || '').trim();
         this.settings.preprocessBaseUrl = String($('#mimo_tts_preprocess_base_url').val() || '').trim();
@@ -322,8 +333,8 @@ class MimoTtsProvider {
 
     async generateTts(text, voiceId) {
         const voice = await this.getVoice(voiceId);
-        const preparedText = await this.preprocessText(text, voice);
-        return this.fetchTtsGeneration(preparedText, voice);
+        const audioBlob = await this.getOrCreateAudioBlob(text, voice);
+        return this.createAudioResponse(audioBlob);
     }
 
     async previewTtsVoice(voiceId) {
@@ -426,13 +437,42 @@ class MimoTtsProvider {
 
         try {
             const voice = await this.getIndependentVoice();
-            const preparedText = await this.preprocessText(text, voice);
-            const response = await this.fetchTtsGeneration(preparedText, voice);
-            const audioBlob = await response.blob();
+            const audioBlob = await this.getOrCreateAudioBlob(text, voice);
             await this.playIndependentBlob(audioBlob);
         } finally {
             button.classList.remove('mimo-tts-loading');
         }
+    }
+
+    async getOrCreateAudioBlob(inputText, voice) {
+        const cacheKey = await this.buildAudioCacheKey(inputText, voice);
+
+        if (this.settings.independentCacheEnabled) {
+            const cachedBlob = await this.readAudioCache(cacheKey);
+
+            if (cachedBlob) {
+                return cachedBlob;
+            }
+        }
+
+        const preparedText = await this.preprocessText(inputText, voice);
+        const response = await this.fetchTtsGeneration(preparedText, voice);
+        const audioBlob = await response.blob();
+
+        if (this.settings.independentCacheEnabled) {
+            await this.writeAudioCache(cacheKey, audioBlob, inputText, voice);
+        }
+
+        return audioBlob;
+    }
+
+    createAudioResponse(audioBlob) {
+        return new Response(audioBlob, {
+            status: 200,
+            headers: {
+                'Content-Type': this.getAudioMimeType(this.settings.format),
+            },
+        });
     }
 
     async getIndependentVoice() {
@@ -483,6 +523,193 @@ class MimoTtsProvider {
             .replace(/\{\{.*?\}\}/g, '')
             .replace(/\s+/g, ' ')
             .trim();
+    }
+
+    async buildAudioCacheKey(inputText, voice) {
+        const material = JSON.stringify({
+            version: 2,
+            inputText,
+            voice,
+            baseUrl: this.normalizeBaseUrl(this.settings.baseUrl),
+            presetModel: this.settings.presetModel,
+            voiceDesignModel: this.settings.voiceDesignModel,
+            format: this.settings.format,
+            optimizeTextPreview: this.settings.optimizeTextPreview,
+            instruction: this.settings.instruction,
+            preprocessEnabled: this.settings.preprocessEnabled,
+            preprocessModel: this.settings.preprocessModel,
+            preprocessTemperature: this.settings.preprocessTemperature,
+            preprocessStyle: this.settings.preprocessStyle,
+            preprocessCustomStyle: this.settings.preprocessCustomStyle,
+            preprocessPrompt: this.settings.preprocessPrompt,
+        });
+
+        return `mimo-audio:${await this.sha256(material)}`;
+    }
+
+    async sha256(value) {
+        if (window.crypto?.subtle) {
+            const data = new TextEncoder().encode(value);
+            const hash = await window.crypto.subtle.digest('SHA-256', data);
+            return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+        }
+
+        let hash = 0;
+        for (let index = 0; index < value.length; index += 1) {
+            hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
+        }
+        return String(hash);
+    }
+
+    async openAudioCacheDb() {
+        if (!window.indexedDB) {
+            return null;
+        }
+
+        if (this.cacheDbPromise) {
+            return this.cacheDbPromise;
+        }
+
+        this.cacheDbPromise = new Promise((resolve, reject) => {
+            const request = window.indexedDB.open('mimo-advanced-tts-cache', 1);
+
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                const store = db.createObjectStore('audio', { keyPath: 'key' });
+                store.createIndex('createdAt', 'createdAt');
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        }).catch((error) => {
+            console.warn('MiMo Advanced cache open failed', error);
+            this.cacheDbPromise = null;
+            return null;
+        });
+
+        return this.cacheDbPromise;
+    }
+
+    async readAudioCache(key) {
+        try {
+            const db = await this.openAudioCacheDb();
+            if (!db) {
+                return null;
+            }
+
+            const transaction = db.transaction('audio', 'readwrite');
+            const store = transaction.objectStore('audio');
+            const entry = await this.idbRequest(store.get(key));
+
+            if (!entry?.blob) {
+                return null;
+            }
+
+            entry.createdAt = Date.now();
+            store.put(entry);
+            await this.idbTransactionDone(transaction);
+            await this.pruneAudioCache();
+            return entry.blob;
+        } catch (error) {
+            console.warn('MiMo Advanced cache read failed', error);
+            return null;
+        }
+    }
+
+    async writeAudioCache(key, blob, inputText, voice) {
+        try {
+            const db = await this.openAudioCacheDb();
+            if (!db) {
+                return;
+            }
+
+            const transaction = db.transaction('audio', 'readwrite');
+            const done = this.idbTransactionDone(transaction);
+            const store = transaction.objectStore('audio');
+            await this.idbRequest(store.put({
+                key,
+                blob,
+                createdAt: Date.now(),
+                format: this.settings.format,
+                voiceId: voice.voice_id,
+                voiceName: voice.name,
+                textPreview: inputText.slice(0, 80),
+            }));
+            await done;
+            await this.pruneAudioCache();
+        } catch (error) {
+            console.warn('MiMo Advanced cache write failed', error);
+        }
+    }
+
+    async pruneAudioCache() {
+        const db = await this.openAudioCacheDb();
+        if (!db) {
+            return;
+        }
+
+        const entries = await this.getAudioCacheEntries();
+        const overflow = entries
+            .sort((left, right) => right.createdAt - left.createdAt)
+            .slice(Number(this.settings.independentCacheLimit) || 5);
+
+        if (!overflow.length) {
+            return;
+        }
+
+        const transaction = db.transaction('audio', 'readwrite');
+        const done = this.idbTransactionDone(transaction);
+        const store = transaction.objectStore('audio');
+        for (const entry of overflow) {
+            store.delete(entry.key);
+        }
+        await done;
+    }
+
+    async getAudioCacheEntries() {
+        const db = await this.openAudioCacheDb();
+        if (!db) {
+            return [];
+        }
+
+        const store = db.transaction('audio', 'readonly').objectStore('audio');
+        return await this.idbRequest(store.getAll());
+    }
+
+    async clearAudioCacheWithToast() {
+        try {
+            await this.clearAudioCache();
+            toastr.success('已清空 MiMo Advanced 语音缓存。', 'MiMo Advanced');
+        } catch (error) {
+            console.warn('MiMo Advanced cache clear failed', error);
+            toastr.error('清空语音缓存失败。', 'MiMo Advanced');
+        }
+    }
+
+    async clearAudioCache() {
+        const db = await this.openAudioCacheDb();
+        if (!db) {
+            return;
+        }
+
+        const transaction = db.transaction('audio', 'readwrite');
+        const done = this.idbTransactionDone(transaction);
+        transaction.objectStore('audio').clear();
+        await done;
+    }
+
+    idbRequest(request) {
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    idbTransactionDone(transaction) {
+        return new Promise((resolve, reject) => {
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+            transaction.onabort = () => reject(transaction.error);
+        });
     }
 
     async fetchTtsGeneration(inputText, voice) {

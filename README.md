@@ -34,6 +34,7 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 - 可选启用 `DeepSeek 朗读前预处理`：先用 DeepSeek 去掉非对话内容，再把对白整理成带情绪、语速、停顿、呼吸、咳嗽、笑声等细粒度标注的 MiMo 朗读文本。
 - 角色音色映射、单条消息朗读、自动朗读和 `/speak` 都使用 SillyTavern 内置 TTS 功能。
 - 可选启用 `给每条助手消息添加独立播放按钮`：只给非用户消息加一个独立播放按钮，点击后临时预处理并播放该条消息，不进入 SillyTavern 内置 TTS 队列。
+- 独立播放会自动缓存最近 5 条语音。缓存保存在浏览器 IndexedDB，命中缓存时不会重复请求 DeepSeek 或 MiMo；超过 5 条会自动删除最旧缓存。
 
 如果你的 SillyTavern 已经内置官方 `MiMo` Provider，可以继续保留它；本插件会显示为 `MiMo Advanced`，主要用于 DeepSeek 表演预处理和自定义风格预设。
 
@@ -65,6 +66,8 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 ```
 
 预处理结果只用于当前这次 TTS 请求，不会写回聊天记录，也不会修改页面上的原消息。
+
+独立播放缓存只保存生成后的音频，不保存到聊天记录或插件目录。清空浏览器站点数据、换浏览器、换设备或点击插件里的 `清空插件语音缓存` 都会移除这些缓存。
 
 ## 音色设计示例
 
