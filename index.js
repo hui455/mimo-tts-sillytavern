@@ -51,7 +51,7 @@ class MimoTtsProvider {
 3. 你只允许做当前模式要求的处理：裁掉非对话内容；或为 MiMo 生成自然语言控制说明；或在对白前/对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（小声）（压低声音）（轻笑）（大笑）（冷笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
 4. 去除非对话内容：旁白、动作描写、场景描写、系统提示、玩家指令、表情包、URL、代码块、角色名标签、楼层信息、括号里的纯动作说明。
 5. 保留真正应该被听见的对白、内心独白、喊话、低语、吐槽和拟声词；保留原来的称呼、语气词、口癖、错字和标点风格。
-6. 细粒度控制语气、情绪、音量、语速、停顿和呼吸，但不要每句话都堆满标注。每 1 到 3 句最多插入 1 个关键标注。
+6. 细粒度控制语气、情绪、音量、语速、停顿和呼吸，尽量减少干巴巴逐句朗读的感觉；可以根据上下文加入轻微迟疑、笑意、叹气、呼吸、停顿、尾音变化和潜台词情绪，但不要每句话都堆满标注。每 1 到 3 句最多插入 1 个关键标注。
 7. 如果没有任何可朗读对白，只输出：<EMPTY>。
 
 风格样例：
@@ -71,53 +71,53 @@ class MimoTtsProvider {
         preprocessStylePresets: [
             {
                 id: 'natural-dialogue',
-                name: '自然对白',
-                prompt: '像真人聊天一样自然，标注从少但精准。优先保留角色原本语气，让停顿和轻微情绪自然出现。可用（笑）（轻笑）（叹气）（停顿片刻）。',
+                name: '恋人日常',
+                prompt: '女生对男朋友说话的自然情侣语气，亲近、放松、不端着。避免干巴巴念台词，要有生活里的轻微笑意、停顿、尾音和潜台词情绪。保留原对白内容和口癖，适合日常聊天、关心、轻声吐槽。常用（轻笑）（温柔）（小声）（停顿片刻）。',
             },
             {
                 id: 'intimate-whisper',
-                name: '亲密耳语',
-                prompt: '整体压低音量，贴近耳边说话，语速偏慢，气息感明显。适合温柔、暧昧、安抚或秘密交流，常用（小声）（压低声音）（轻声）（停顿片刻）（浅浅吸气）。',
+                name: '贴近耳语',
+                prompt: '女生靠近男朋友低声说话，音量压低，语速偏慢，气息和停顿更明显。不要像读稿，要像贴近耳边临时说出口，带一点迟疑、呼吸和黏人的亲密感。适合睡前、秘密、暧昧、想被抱抱的场景。常用（小声）（压低声音）（轻声）（浅浅吸气）（停顿片刻）。',
             },
             {
                 id: 'comic-snark',
-                name: '喜剧吐槽',
-                prompt: '节奏灵活，吐槽感强，适当加入短促停顿、无奈笑、阴阳怪气的小情绪。常用（小声吐槽）（憋笑）（无奈）（语速加快）（夸张地停顿）。',
+                name: '傲娇嘴硬',
+                prompt: '女生对男朋友表面嫌弃、嘴硬不承认，实际带关心和亲密感。要有口是心非的停顿、轻哼、憋笑和句尾小情绪，减少平铺直叙。节奏稍快，吐槽不要变成真正攻击。常用（小声吐槽）（轻哼）（憋笑）（语速加快）（别扭）。',
             },
             {
                 id: 'exhausted-low',
-                name: '疲惫低气压',
-                prompt: '声音有气无力，语速偏慢，句尾下坠，呼吸拖长。适合加班、受伤、困倦或情绪耗尽。常用（极其疲惫）（有气无力）（长叹一口气）（低声）（停顿片刻）。',
+                name: '疲惫依赖',
+                prompt: '女生在男朋友面前卸下防备，声音有气无力，语速偏慢，句尾下坠，像累了以后只想靠着他说话。加入自然的叹气、停顿和黏人的依赖感，避免机械读句子。适合加班后、困倦、受委屈、求抱抱。常用（有气无力）（低声）（长叹一口气）（停顿片刻）（小声）。',
             },
             {
                 id: 'nervous-mutter',
-                name: '紧张碎碎念',
-                prompt: '紧张、呼吸明显、话语变碎，语速会在自我安慰或慌乱处加快。常用（紧张，深呼吸）（语速加快，碎碎念）（小声）（咽了咽口水）（停顿片刻）。',
+                name: '害羞碎碎念',
+                prompt: '女生对男朋友害羞又想靠近，呼吸轻，话语变碎，越解释越小声，偶尔语速加快。要有临场感，像一边害羞一边找补，不要整齐地念完。适合告白、被夸、暧昧拉扯、第一次主动表达。常用（害羞）（小声）（语速加快，碎碎念）（轻轻吸气）（停顿片刻）。',
             },
             {
                 id: 'restrained-sad',
-                name: '悲伤克制',
-                prompt: '情绪压住不爆发，停顿长，苦笑和轻声自嘲可以出现。避免哭腔过度。常用（沉默片刻）（苦笑）（声音发紧）（轻声）（停顿很久）。',
+                name: '委屈吃醋',
+                prompt: '女生对男朋友有点吃醋和委屈，声音发闷，语速放慢，带试探和小情绪，但不要大吵大闹。加入欲言又止、短暂停顿和装作不在意的苦笑，减少直白质问感。适合吃醋、误会、想被哄。常用（委屈）（声音发闷）（小声）（沉默片刻）（苦笑）。',
             },
             {
                 id: 'cold-breathless',
-                name: '寒冷急促',
-                prompt: '寒冷导致呼吸急促，句子断裂，偶尔咳嗽或牙关打颤。常用（寒冷导致的急促呼吸）（咳嗽）（牙关打颤）（呼——呼——）（别停下）。',
+                name: '撒娇求哄',
+                prompt: '女生对男朋友撒娇、求哄、想被偏爱，声音软，尾音轻轻上扬，语速不快。要像真实恋人小声磨人，带一点拐弯、停顿和轻哼，亲密但不过分油腻。适合想抱抱、想被陪、故意闹小脾气。常用（撒娇）（软声）（小声）（轻哼）（尾音上扬）。',
             },
             {
                 id: 'market-shout',
-                name: '街头叫卖',
-                prompt: '音量高，节奏快，有现场感和招呼人的劲儿。适合吆喝、喊话、争执。常用（提高音量喊话）（语速加快）（招呼客人）（不耐烦）（拉长尾音）。',
+                name: '调皮撩拨',
+                prompt: '女生对男朋友轻快撩拨，带笑意和一点坏心思，节奏灵活，偶尔故意停顿。要有临场反应感，像边看他反应边说，不要平直输出。适合开玩笑、逗他、反撩、气氛暧昧但不过界。常用（轻笑）（调皮）（故意停顿）（语速放慢）（小声）。',
             },
             {
                 id: 'combat-urgent',
-                name: '战斗急促',
-                prompt: '短句、命令式、呼吸急，重点字更用力。适合追逐、战斗、危险提醒。常用（急促）（压低声音）（提高音量）（喘息）（立刻打断）。',
+                name: '认真告白',
+                prompt: '女生对男朋友认真表达感情，语速放慢，声音干净，停顿稍长，情绪真诚克制，不夸张煽情。加入犹豫、吸气、停顿和重点词放轻，让它像真的鼓起勇气说出口。适合告白、承诺、重要谈话。常用（认真）（放慢语速）（轻声）（停顿片刻）（声音发紧）。',
             },
             {
                 id: 'asmr-soft',
-                name: 'ASMR 轻声',
-                prompt: '声音很轻、贴近、慢速，停顿细腻，避免突然大音量。适合睡前、照顾、耳语。常用（轻声）（放慢语速）（浅浅呼吸）（停顿片刻）（温柔地）。',
+                name: '和好安慰',
+                prompt: '女生对男朋友吵架后放软或哄他，前半段别扭、委屈，后半段逐渐温柔安定。要有沉默、叹气、放低姿态和情绪转弯，避免像念和解台词。适合和好、道歉、安慰、把话说开。常用（别扭）（轻声）（沉默片刻）（温柔）（长叹一口气）。',
             },
         ],
     };
@@ -284,6 +284,7 @@ class MimoTtsProvider {
         this.settings = extension_settings[extensionName];
         this.mergeDefaultVoiceCatalogs();
         this.migrateToPresetCloneVoices();
+        this.migrateToRomanceStylePresets();
         this.normalizeVoiceIds();
         return this.settings;
     }
@@ -319,6 +320,15 @@ class MimoTtsProvider {
         delete this.settings.designedVoices;
         delete this.settings.voiceDesignModel;
         this.settings.voiceCatalogMode = 'preset-clone-only-v1';
+    }
+
+    migrateToRomanceStylePresets() {
+        if (this.settings.preprocessStyleCatalogMode === 'romance-female-to-male-v1') {
+            return;
+        }
+
+        this.settings.preprocessStylePresets = structuredClone(this.defaultSettings.preprocessStylePresets);
+        this.settings.preprocessStyleCatalogMode = 'romance-female-to-male-v1';
     }
 
     async loadSettings(settings) {
@@ -1072,7 +1082,7 @@ class MimoTtsProvider {
 
     async buildAudioCacheKey(inputText, voice, preparedText = null) {
         const material = JSON.stringify({
-            version: 14,
+            version: 16,
             inputText,
             preparedText,
             voice,
@@ -1352,6 +1362,7 @@ class MimoTtsProvider {
                         role: 'system',
                         content: [
                             this.settings.preprocessPrompt || this.defaultSettings.preprocessPrompt,
+                            this.buildRelationshipVoiceInstruction(),
                             this.buildPreprocessControlModeInstruction(voice),
                             this.buildStyleInstruction(),
                             this.buildInnerMonologueInstruction(),
@@ -1519,6 +1530,14 @@ class MimoTtsProvider {
         }
 
         return lines.join('\n');
+    }
+
+    buildRelationshipVoiceInstruction() {
+        return `关系语气特化：
+1. 默认把可朗读对白整理成“女生对男朋友说话”的情侣语气；亲近、自然、有生活感，不要像旁白、客服、播音或干巴巴念台词。
+2. 根据上下文加入轻微停顿、笑意、呼吸、迟疑、尾音变化、欲言又止和潜台词情绪，让话像临场说出口。
+3. 情绪可以有层次和转折，例如嘴硬里藏关心、委屈里带试探、撒娇里带小脾气、认真里带紧张；不要把所有句子处理成同一种平直语气。
+4. 不要改变原对白内容，不要把男生口吻改成女生口吻；如果原文明确不是女生对男生的发言，只保留原内容并做最小表演控制。`;
     }
 
     getPreprocessControlMode() {
