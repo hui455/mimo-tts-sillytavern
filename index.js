@@ -132,101 +132,108 @@ class MimoTtsProvider {
 
     get settingsFormHtml() {
         return `
-        <div id="mimo_tts_extension_settings" class="mimo-tts-provider-settings">
-            <h3>MiMo Advanced TTS</h3>
-            <div class="tts_block">
-                <label for="mimo_tts_api_key">MiMo API Key</label>
-                <input id="mimo_tts_api_key" type="password" class="text_pole" autocomplete="off" placeholder="从 MiMo Console 获取">
+        <div id="mimo_tts_extension_settings" class="inline-drawer">
+            <div class="inline-drawer-toggle inline-drawer-header">
+                <b>MiMo Advanced TTS</b>
+                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
             </div>
-            <div class="tts_block">
-                <label for="mimo_tts_base_url">Base URL</label>
-                <input id="mimo_tts_base_url" type="text" class="text_pole" maxlength="500">
-            </div>
-            <div class="tts_block">
-                <label for="mimo_tts_preset_model">预置音色模型</label>
-                <input id="mimo_tts_preset_model" type="text" class="text_pole">
-            </div>
-            <div class="tts_block">
-                <label for="mimo_tts_voice_design_model">音色设计模型</label>
-                <input id="mimo_tts_voice_design_model" type="text" class="text_pole">
-            </div>
-            <div class="tts_block">
-                <label for="mimo_tts_instruction">朗读控制提示词</label>
-                <textarea id="mimo_tts_instruction" class="text_pole" rows="3"></textarea>
-            </div>
-            <div class="tts_block">
-                <label for="mimo_tts_format">音频格式</label>
-                <select id="mimo_tts_format" class="text_pole">
-                    <option value="wav">wav</option>
-                    <option value="mp3">mp3</option>
-                </select>
-            </div>
-            <div class="tts_block">
-                <label>
-                    <input id="mimo_tts_optimize_text_preview" type="checkbox">
-                    optimize_text_preview
-                </label>
-            </div>
-            <hr>
-            <div class="tts_block flexFlowColumn">
-                <h4>独立消息播放按钮</h4>
-                <label>
-                    <input id="mimo_tts_independent_buttons" type="checkbox">
-                    给每条助手消息添加独立播放按钮
-                </label>
-                <label for="mimo_tts_independent_voice">独立播放音色</label>
-                <select id="mimo_tts_independent_voice" class="text_pole"></select>
-                <label for="mimo_tts_preview_text">试音文本</label>
-                <textarea id="mimo_tts_preview_text" class="text_pole" rows="3"></textarea>
-                <input id="mimo_tts_preview_selected_voice" type="button" class="menu_button" value="试听当前独立播放音色">
-                <label>
-                    <input id="mimo_tts_independent_cache" type="checkbox">
-                    自动缓存最近 5 条语音
-                </label>
-                <input id="mimo_tts_clear_cache" type="button" class="menu_button" value="清空插件语音缓存">
-                <input id="mimo_tts_independent_stop" type="button" class="menu_button" value="停止独立播放">
-            </div>
-            <hr>
-            <div class="tts_block flexFlowColumn">
-                <h4>DeepSeek 朗读前预处理</h4>
-                <label>
-                    <input id="mimo_tts_preprocess_enabled" type="checkbox">
-                    启用 DeepSeek 预处理
-                </label>
-                <label for="mimo_tts_preprocess_api_key">DeepSeek API Key</label>
-                <input id="mimo_tts_preprocess_api_key" type="password" class="text_pole" autocomplete="off" placeholder="用于改写朗读文本">
-                <label for="mimo_tts_preprocess_base_url">DeepSeek Base URL</label>
-                <input id="mimo_tts_preprocess_base_url" type="text" class="text_pole" maxlength="500">
-                <label for="mimo_tts_preprocess_model">DeepSeek 模型</label>
-                <input id="mimo_tts_preprocess_model" type="text" class="text_pole">
-                <label for="mimo_tts_preprocess_temperature">Temperature: <span id="mimo_tts_preprocess_temperature_output"></span></label>
-                <input id="mimo_tts_preprocess_temperature" type="range" min="0" max="1" step="0.05">
-                <label for="mimo_tts_preprocess_style">表演风格预设</label>
-                <select id="mimo_tts_preprocess_style" class="text_pole"></select>
-                <label for="mimo_tts_preprocess_custom_style">自定义风格补充</label>
-                <textarea id="mimo_tts_preprocess_custom_style" class="text_pole" rows="4" placeholder="例如：更傲娇一点，句尾带一点不服气；亲密场景用更轻的气声；战斗场景不要夸张喊叫。"></textarea>
-                <label>
-                    <input id="mimo_tts_preprocess_fallback" type="checkbox">
-                    预处理失败时回退原文
-                </label>
-                <label for="mimo_tts_preprocess_prompt">预处理提示词</label>
-                <textarea id="mimo_tts_preprocess_prompt" class="text_pole" rows="12"></textarea>
-            </div>
-            <hr>
-            <div class="tts_block flexFlowColumn">
-                <h4>新增预置音色</h4>
-                <input id="mimo_tts_preset_voice_name" type="text" class="text_pole" placeholder="显示名，例如：冰糖">
-                <input id="mimo_tts_preset_voice_id" type="text" class="text_pole" placeholder="MiMo voice，例如：冰糖">
-                <input id="mimo_tts_add_preset_voice" type="button" class="menu_button" value="添加预置音色">
-                <div id="mimo_tts_preset_voice_list" class="mimo-tts-list"></div>
-            </div>
-            <hr>
-            <div class="tts_block flexFlowColumn">
-                <h4>新增音色设计</h4>
-                <input id="mimo_tts_design_voice_name" type="text" class="text_pole" placeholder="显示名，例如：温柔姐姐">
-                <textarea id="mimo_tts_design_voice_prompt" class="text_pole" rows="4" placeholder="描述性别年龄、声音质感、情绪语气、语速节奏、场景人设"></textarea>
-                <input id="mimo_tts_add_design_voice" type="button" class="menu_button" value="添加设计音色">
-                <div id="mimo_tts_design_voice_list" class="mimo-tts-list"></div>
+            <div class="inline-drawer-content" style="display: none;">
+                <div class="mimo-tts-provider-settings">
+                    <div class="tts_block">
+                        <label for="mimo_tts_api_key">MiMo API Key</label>
+                        <input id="mimo_tts_api_key" type="password" class="text_pole" autocomplete="off" placeholder="从 MiMo Console 获取">
+                    </div>
+                    <div class="tts_block">
+                        <label for="mimo_tts_base_url">Base URL</label>
+                        <input id="mimo_tts_base_url" type="text" class="text_pole" maxlength="500">
+                    </div>
+                    <div class="tts_block">
+                        <label for="mimo_tts_preset_model">预置音色模型</label>
+                        <input id="mimo_tts_preset_model" type="text" class="text_pole">
+                    </div>
+                    <div class="tts_block">
+                        <label for="mimo_tts_voice_design_model">音色设计模型</label>
+                        <input id="mimo_tts_voice_design_model" type="text" class="text_pole">
+                    </div>
+                    <div class="tts_block">
+                        <label for="mimo_tts_instruction">朗读控制提示词</label>
+                        <textarea id="mimo_tts_instruction" class="text_pole" rows="3"></textarea>
+                    </div>
+                    <div class="tts_block">
+                        <label for="mimo_tts_format">音频格式</label>
+                        <select id="mimo_tts_format" class="text_pole">
+                            <option value="wav">wav</option>
+                            <option value="mp3">mp3</option>
+                        </select>
+                    </div>
+                    <div class="tts_block">
+                        <label>
+                            <input id="mimo_tts_optimize_text_preview" type="checkbox">
+                            optimize_text_preview
+                        </label>
+                    </div>
+                    <hr>
+                    <div class="tts_block flexFlowColumn">
+                        <h4>独立消息播放按钮</h4>
+                        <label>
+                            <input id="mimo_tts_independent_buttons" type="checkbox">
+                            给每条助手消息添加独立播放按钮
+                        </label>
+                        <label for="mimo_tts_independent_voice">独立播放音色</label>
+                        <select id="mimo_tts_independent_voice" class="text_pole"></select>
+                        <label for="mimo_tts_preview_text">试音文本</label>
+                        <textarea id="mimo_tts_preview_text" class="text_pole" rows="3"></textarea>
+                        <input id="mimo_tts_preview_selected_voice" type="button" class="menu_button" value="试听当前独立播放音色">
+                        <label>
+                            <input id="mimo_tts_independent_cache" type="checkbox">
+                            自动缓存最近 5 条语音
+                        </label>
+                        <input id="mimo_tts_clear_cache" type="button" class="menu_button" value="清空插件语音缓存">
+                        <input id="mimo_tts_independent_stop" type="button" class="menu_button" value="停止独立播放">
+                    </div>
+                    <hr>
+                    <div class="tts_block flexFlowColumn">
+                        <h4>DeepSeek 朗读前预处理</h4>
+                        <label>
+                            <input id="mimo_tts_preprocess_enabled" type="checkbox">
+                            启用 DeepSeek 预处理
+                        </label>
+                        <label for="mimo_tts_preprocess_api_key">DeepSeek API Key</label>
+                        <input id="mimo_tts_preprocess_api_key" type="password" class="text_pole" autocomplete="off" placeholder="用于改写朗读文本">
+                        <label for="mimo_tts_preprocess_base_url">DeepSeek Base URL</label>
+                        <input id="mimo_tts_preprocess_base_url" type="text" class="text_pole" maxlength="500">
+                        <label for="mimo_tts_preprocess_model">DeepSeek 模型</label>
+                        <input id="mimo_tts_preprocess_model" type="text" class="text_pole">
+                        <label for="mimo_tts_preprocess_temperature">Temperature: <span id="mimo_tts_preprocess_temperature_output"></span></label>
+                        <input id="mimo_tts_preprocess_temperature" type="range" min="0" max="1" step="0.05">
+                        <label for="mimo_tts_preprocess_style">表演风格预设</label>
+                        <select id="mimo_tts_preprocess_style" class="text_pole"></select>
+                        <label for="mimo_tts_preprocess_custom_style">自定义风格补充</label>
+                        <textarea id="mimo_tts_preprocess_custom_style" class="text_pole" rows="4" placeholder="例如：更傲娇一点，句尾带一点不服气；亲密场景用更轻的气声；战斗场景不要夸张喊叫。"></textarea>
+                        <label>
+                            <input id="mimo_tts_preprocess_fallback" type="checkbox">
+                            预处理失败时回退原文
+                        </label>
+                        <label for="mimo_tts_preprocess_prompt">预处理提示词</label>
+                        <textarea id="mimo_tts_preprocess_prompt" class="text_pole" rows="12"></textarea>
+                    </div>
+                    <hr>
+                    <div class="tts_block flexFlowColumn">
+                        <h4>新增预置音色</h4>
+                        <input id="mimo_tts_preset_voice_name" type="text" class="text_pole" placeholder="显示名，例如：冰糖">
+                        <input id="mimo_tts_preset_voice_id" type="text" class="text_pole" placeholder="MiMo voice，例如：冰糖">
+                        <input id="mimo_tts_add_preset_voice" type="button" class="menu_button" value="添加预置音色">
+                        <div id="mimo_tts_preset_voice_list" class="mimo-tts-list"></div>
+                    </div>
+                    <hr>
+                    <div class="tts_block flexFlowColumn">
+                        <h4>新增音色设计</h4>
+                        <input id="mimo_tts_design_voice_name" type="text" class="text_pole" placeholder="显示名，例如：温柔姐姐">
+                        <textarea id="mimo_tts_design_voice_prompt" class="text_pole" rows="4" placeholder="描述性别年龄、声音质感、情绪语气、语速节奏、场景人设"></textarea>
+                        <input id="mimo_tts_add_design_voice" type="button" class="menu_button" value="添加设计音色">
+                        <div id="mimo_tts_design_voice_list" class="mimo-tts-list"></div>
+                    </div>
+                </div>
             </div>
         </div>
         `;
@@ -277,6 +284,7 @@ class MimoTtsProvider {
 
         this.populateSettingsForm();
         this.bindSettingsEvents();
+        this.bindDrawerFallback();
         this.renderVoiceLists();
         this.setupIndependentButtons();
 
@@ -331,6 +339,15 @@ class MimoTtsProvider {
         }));
         $('#mimo_tts_add_preset_voice').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.addPresetVoice());
         $('#mimo_tts_add_design_voice').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.addDesignedVoice());
+    }
+
+    bindDrawerFallback() {
+        $('#mimo_tts_extension_settings .inline-drawer-toggle').off('click.mimoAdvancedDrawer').on('click.mimoAdvancedDrawer', () => {
+            const content = $('#mimo_tts_extension_settings .inline-drawer-content');
+            const icon = $('#mimo_tts_extension_settings .inline-drawer-icon');
+            content.slideToggle(120);
+            icon.toggleClass('down up');
+        });
     }
 
     dispose() {
