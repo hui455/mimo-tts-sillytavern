@@ -90,7 +90,11 @@ class MimoTtsProvider {
             { name: '冰糖', voice_id: 'preset:冰糖', lang: 'zh-CN' },
             { name: '茉莉', voice_id: 'preset:茉莉', lang: 'zh-CN' },
             { name: '苏打', voice_id: 'preset:苏打', lang: 'zh-CN' },
+            { name: '白桦', voice_id: 'preset:白桦', lang: 'zh-CN' },
             { name: 'Chloe', voice_id: 'preset:Chloe', lang: 'zh-CN' },
+            { name: 'Mia', voice_id: 'preset:Mia', lang: 'en-US' },
+            { name: 'Milo', voice_id: 'preset:Milo', lang: 'en-US' },
+            { name: 'Dean', voice_id: 'preset:Dean', lang: 'en-US' },
         ],
         clonedVoices: [],
         preprocessStylePresets: [
