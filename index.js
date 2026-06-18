@@ -261,7 +261,13 @@ class MimoTtsProvider {
 
         this.renderVoiceLists();
         this.setupIndependentButtons();
-        await this.checkReady();
+
+        try {
+            await this.checkReady();
+        } catch (error) {
+            console.debug('MiMo TTS: settings loaded, provider not ready yet', error);
+        }
+
         console.debug('MiMo TTS: settings loaded');
     }
 
@@ -427,7 +433,7 @@ class MimoTtsProvider {
     }
 
     async playIndependentMessage(messageElement, button) {
-        const text = this.cleanMessageText(messageElement.querySelector('.mes_text')?.innerText || '');
+        const text = this.getMessageSpeakText(messageElement);
 
         if (!text) {
             throw new Error('这条消息没有可朗读文本。');
@@ -444,8 +450,36 @@ class MimoTtsProvider {
         }
     }
 
+    getMessageSpeakText(messageElement) {
+        const textElement = messageElement.querySelector('.mes_text');
+
+        if (!textElement) {
+            return '';
+        }
+
+        const clone = textElement.cloneNode(true);
+        clone.querySelectorAll([
+            '.mes_reasoning',
+            '.reasoning',
+            '.thinking',
+            '.thoughts',
+            '.reasoning_details',
+            '.reasoning-content',
+            '[data-reasoning]',
+            '[data-thinking]',
+        ].join(',')).forEach((element) => element.remove());
+
+        return this.cleanMessageText(clone.innerText || clone.textContent || '');
+    }
+
     async getOrCreateAudioBlob(inputText, voice) {
-        const cacheKey = await this.buildAudioCacheKey(inputText, voice);
+        const cleanInputText = this.cleanMessageText(inputText);
+
+        if (!cleanInputText) {
+            throw new Error('没有可朗读文本。');
+        }
+
+        const cacheKey = await this.buildAudioCacheKey(cleanInputText, voice);
 
         if (this.settings.independentCacheEnabled) {
             const cachedBlob = await this.readAudioCache(cacheKey);
@@ -455,12 +489,12 @@ class MimoTtsProvider {
             }
         }
 
-        const preparedText = await this.preprocessText(inputText, voice);
+        const preparedText = await this.preprocessText(cleanInputText, voice);
         const response = await this.fetchTtsGeneration(preparedText, voice);
         const audioBlob = await response.blob();
 
         if (this.settings.independentCacheEnabled) {
-            await this.writeAudioCache(cacheKey, audioBlob, inputText, voice);
+            await this.writeAudioCache(cacheKey, audioBlob, cleanInputText, voice);
         }
 
         return audioBlob;
@@ -517,12 +551,24 @@ class MimoTtsProvider {
     }
 
     cleanMessageText(text) {
-        return String(text || '')
+        return this.removeThinkingText(String(text || ''))
             .replace(/```[\s\S]*?```/g, '')
             .replace(/\[[^\]]*?]\([^)]*?\)/g, '$1')
             .replace(/\{\{.*?\}\}/g, '')
             .replace(/\s+/g, ' ')
             .trim();
+    }
+
+    removeThinkingText(text) {
+        return String(text || '')
+            .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '')
+            .replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, '')
+            .replace(/<reasoning\b[^>]*>[\s\S]*?<\/reasoning>/gi, '')
+            .replace(/<analysis\b[^>]*>[\s\S]*?<\/analysis>/gi, '')
+            .replace(/\[think\][\s\S]*?\[\/think\]/gi, '')
+            .replace(/\[thinking\][\s\S]*?\[\/thinking\]/gi, '')
+            .replace(/\[reasoning\][\s\S]*?\[\/reasoning\]/gi, '')
+            .replace(/(?:^|\n)\s*(?:思考|思考过程|推理过程|内心推理|thinking|reasoning)\s*[:：][\s\S]*?(?=\n\s*(?:正文|回复|最终回复|assistant|角色回复)\s*[:：]|\n{2,}|$)/gi, '\n');
     }
 
     async buildAudioCacheKey(inputText, voice) {
