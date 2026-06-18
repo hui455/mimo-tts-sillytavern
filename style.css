@@ -67,6 +67,17 @@
   color: var(--SmartThemeQuoteColor);
 }
 
+.mimo-tts-scene-select {
+  font-size: 12px;
+  padding: 1px 4px;
+  height: 22px;
+  width: auto;
+  min-width: 52px;
+  margin-left: 4px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
 .mimo-tts-file-row {
   display: flex;
   align-items: center;

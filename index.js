@@ -594,6 +594,7 @@ class MimoTtsProvider {
     removeIndependentButtons() {
         document.querySelectorAll('.mimo-tts-independent-button').forEach((button) => button.remove());
         document.querySelectorAll('.mimo-tts-download-button').forEach((button) => button.remove());
+        document.querySelectorAll('.mimo-tts-scene-select').forEach((select) => select.remove());
     }
 
     decorateIndependentButtons() {
@@ -604,10 +605,21 @@ class MimoTtsProvider {
         document.querySelectorAll('#chat .mes').forEach((messageElement) => {
             if (!this.isAssistantMessageElement(messageElement)) {
                 messageElement.querySelectorAll('.mimo-tts-independent-button').forEach((button) => button.remove());
+                messageElement.querySelectorAll('.mimo-tts-scene-select').forEach((select) => select.remove());
                 return;
             }
 
-            if (messageElement.querySelector('.mimo-tts-independent-button')) {
+            const existingButton = messageElement.querySelector('.mimo-tts-independent-button');
+
+            if (this.settings.backgroundAudioEnabled) {
+                if (existingButton) {
+                    this.ensureSceneSelect(existingButton, messageElement);
+                }
+            } else {
+                messageElement.querySelectorAll('.mimo-tts-scene-select').forEach((select) => select.remove());
+            }
+
+            if (existingButton) {
                 return;
             }
 
@@ -630,7 +642,47 @@ class MimoTtsProvider {
                 }
             });
             host.append(button);
+
+            if (this.settings.backgroundAudioEnabled) {
+                this.ensureSceneSelect(button, messageElement);
+            } else {
+                button.parentElement?.querySelector('.mimo-tts-scene-select')?.remove();
+            }
         });
+    }
+
+    ensureSceneSelect(button, messageElement) {
+        const existingSelect = button.parentElement?.querySelector('.mimo-tts-scene-select');
+        if (existingSelect) {
+            return;
+        }
+
+        const select = document.createElement('select');
+        select.className = 'mimo-tts-scene-select text_pole';
+        select.title = '选择背景声场景';
+        select.setAttribute('aria-label', '选择背景声场景');
+
+        const defaultOption = document.createElement('option');
+        defaultOption.value = 'other';
+        defaultOption.textContent = '无';
+        select.append(defaultOption);
+
+        const enabledScenes = (this.settings.backgroundScenes || []).filter((s) => s.enabled !== false && s.id !== 'other');
+        for (const scene of enabledScenes) {
+            const option = document.createElement('option');
+            option.value = scene.id;
+            option.textContent = scene.name;
+            select.append(option);
+        }
+
+        select.addEventListener('change', () => {
+            button.dataset.mimoSceneId = select.value;
+        });
+        select.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+
+        button.after(select);
     }
 
     isAssistantMessageElement(messageElement) {
@@ -677,6 +729,7 @@ class MimoTtsProvider {
         try {
             const voice = await this.getIndependentVoice();
             const preparedSpeech = await this.preprocessSpeech(text, voice);
+            preparedSpeech.scene = button.dataset.mimoSceneId || 'other';
             if (!preparedSpeech?.text) {
                 throw new Error('DeepSeek 预处理后没有可朗读对白。');
             }
@@ -1377,12 +1430,8 @@ class MimoTtsProvider {
     }
 
     async preprocessSpeech(inputText, voice) {
-        const matchedScene = this.matchSceneByKeywords(inputText);
-
         if (!this.settings.preprocessEnabled) {
-            const result = this.normalizePreparedSpeech(inputText, inputText);
-            result.scene = matchedScene;
-            return result;
+            return this.normalizePreparedSpeech(inputText, inputText);
         }
 
         try {
@@ -1390,32 +1439,24 @@ class MimoTtsProvider {
             const cleaned = this.cleanPreprocessorOutput(output);
 
             if (!cleaned || cleaned === '<EMPTY>') {
-                const result = this.normalizePreparedSpeech('', inputText);
-                result.scene = matchedScene;
-                return result;
+                return this.normalizePreparedSpeech('', inputText);
             }
 
             if (this.getPreprocessControlMode() === 'natural-language') {
-                const result = this.parseNaturalLanguagePreprocessOutput(cleaned, inputText);
-                result.scene = matchedScene;
-                return result;
+                return this.parseNaturalLanguagePreprocessOutput(cleaned, inputText);
             }
 
-            const result = this.normalizePreparedSpeech({
+            return this.normalizePreparedSpeech({
                 mode: 'audio-tags',
                 text: cleaned,
                 instruction: '',
             }, inputText);
-            result.scene = matchedScene;
-            return result;
         } catch (error) {
             console.warn('MiMo TTS preprocessing failed', error);
 
             if (this.settings.preprocessFallbackToOriginal) {
                 this.showThrottledPreprocessWarning('DeepSeek 预处理失败，已使用原文继续合成。');
-                const result = this.normalizePreparedSpeech(inputText, inputText);
-                result.scene = matchedScene;
-                return result;
+                return this.normalizePreparedSpeech(inputText, inputText);
             }
 
             throw error;
@@ -2045,26 +2086,6 @@ class MimoTtsProvider {
             .toLowerCase();
 
         return slug || `voice-${Date.now()}`;
-    }
-
-    matchSceneByKeywords(inputText) {
-        if (!this.settings.backgroundAudioEnabled) {
-            return 'other';
-        }
-
-        const text = String(inputText || '').toLowerCase();
-        const enabledScenes = (this.settings.backgroundScenes || []).filter((scene) => scene.enabled !== false && scene.description);
-
-        for (const scene of enabledScenes) {
-            const keywords = scene.description.split(/[,，、\s]+/).filter(Boolean);
-            for (const keyword of keywords) {
-                if (keyword && text.includes(keyword.toLowerCase())) {
-                    return scene.id;
-                }
-            }
-        }
-
-        return 'other';
     }
 
     getBackgroundScene(sceneId) {
