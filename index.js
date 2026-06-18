@@ -1072,7 +1072,7 @@ class MimoTtsProvider {
 
     async buildAudioCacheKey(inputText, voice, preparedText = null) {
         const material = JSON.stringify({
-            version: 13,
+            version: 14,
             inputText,
             preparedText,
             voice,
@@ -1352,7 +1352,7 @@ class MimoTtsProvider {
                         role: 'system',
                         content: [
                             this.settings.preprocessPrompt || this.defaultSettings.preprocessPrompt,
-                            this.buildPreprocessControlModeInstruction(),
+                            this.buildPreprocessControlModeInstruction(voice),
                             this.buildStyleInstruction(),
                             this.buildInnerMonologueInstruction(),
                         ].filter(Boolean).join('\n\n'),
@@ -1531,11 +1531,16 @@ class MimoTtsProvider {
         return mode === 'natural-language' ? '自然语言控制' : mode === 'audio-tags' ? '音频标签控制' : '无预处理';
     }
 
-    buildPreprocessControlModeInstruction() {
+    buildPreprocessControlModeInstruction(voice) {
+        const voiceKind = this.getVoiceKind(voice);
+        const singingInstruction = voiceKind === 'preset'
+            ? '当前使用内置预置音色，支持唱歌模式；只有文本确实需要唱歌时才使用唱歌控制。'
+            : '当前使用声音克隆模型，官方文档说明不支持唱歌模式；不要使用（唱歌）、(sing)、(singing)，也不要在自然语言控制里要求 singing。';
         const shared = `MiMo v2.5 控制能力要求：
 1. 先判断这段文本是否需要多风格切换、多情绪混合、多粒度控制；需要时按段落、句子或短语细分控制，不需要时保持自然克制。
-2. 可控制语气、情绪、语速、音量、停顿、呼吸、笑哭、咳嗽、方言、角色化表达和唱歌；不要为了炫技过度堆叠。
-3. 保留原对白内容，不要为了风格控制改写对白本身。`;
+2. 可控制语气、情绪、语速、音量、停顿、呼吸、笑哭、咳嗽、方言和角色化表达；唱歌只在当前模型支持时使用；不要为了炫技过度堆叠。
+3. 保留原对白内容，不要为了风格控制改写对白本身。
+4. ${singingInstruction}`;
 
         if (this.getPreprocessControlMode() === 'natural-language') {
             return `${shared}
