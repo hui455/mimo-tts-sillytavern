@@ -84,6 +84,8 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 
 添加后在酒馆的 TTS voice map 里把角色映射到这个设计音色即可。
 
+设计音色列表支持 `试听`、`编辑`、`删除`。点击 `编辑` 会把名称和提示词填回输入框，修改后点击 `保存设计音色` 即可覆盖原音色。
+
 ## 注意
 
 - API Key 会保存在 SillyTavern 的扩展设置里。只在你信任的本地环境使用，不要把带有 key 的设置分享给别人。
