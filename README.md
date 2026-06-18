@@ -1,6 +1,6 @@
-# MiMo TTS for SillyTavern
+# MiMo Advanced TTS for SillyTavern
 
-这是一个 SillyTavern 第三方扩展，把小米 MiMo V2.5 TTS 注册为酒馆内置 TTS Provider。
+这是一个 SillyTavern 第三方扩展，把小米 MiMo V2.5 TTS 注册为独立的 `MiMo Advanced` TTS Provider，避免和 SillyTavern 内置 `MiMo` Provider 同名冲突。
 
 ## 安装
 
@@ -22,7 +22,7 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 ## 配置
 
 1. 打开 SillyTavern 的扩展面板，启用内置 `TTS` 扩展。
-2. 在 TTS Provider 下拉里选择 `MiMo`。
+2. 在 TTS Provider 下拉里选择 `MiMo Advanced`。
 3. 填写 `MiMo API Key`。
 4. 保持默认 Base URL：`https://api.xiaomimimo.com/v1`。
 5. 点击 TTS 的刷新按钮，让酒馆重新加载音色列表。
@@ -33,6 +33,8 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 - 音色设计走 `mimo-v2.5-tts-voicedesign`，插件会把设计提示词放在 `user` 消息里，把朗读文本放在 `assistant` 消息里。
 - 可选启用 `DeepSeek 朗读前预处理`：先用 DeepSeek 去掉非对话内容，再把对白整理成带情绪、语速、停顿、呼吸、咳嗽、笑声等细粒度标注的 MiMo 朗读文本。
 - 角色音色映射、单条消息朗读、自动朗读和 `/speak` 都使用 SillyTavern 内置 TTS 功能。
+
+如果你的 SillyTavern 已经内置官方 `MiMo` Provider，可以继续保留它；本插件会显示为 `MiMo Advanced`，主要用于 DeepSeek 表演预处理和自定义风格预设。
 
 ## DeepSeek 预处理风格
 

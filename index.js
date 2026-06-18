@@ -655,4 +655,4 @@ class MimoTtsProvider {
     }
 }
 
-registerTtsProvider('MiMo', MimoTtsProvider);
+registerTtsProvider('MiMo Advanced', MimoTtsProvider);
