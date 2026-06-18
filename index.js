@@ -45,7 +45,7 @@ class MimoTtsProvider {
 规则：
 1. 只输出最终要朗读的文本，不要解释，不要 Markdown，不要 JSON。
 2. 绝对不能改写、润色、扩写、删改或替换原对白文字本身；对白内容必须从输入里原样截取。
-3. 你只允许做两类事：裁掉非对话内容；在对白前或对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（小声）（压低声音）（放声大笑）（苦笑）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
+3. 你只允许做两类事：裁掉非对话内容；在对白前或对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（小声）（压低声音）（轻笑）（大笑）（冷笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
 4. 去除非对话内容：旁白、动作描写、场景描写、系统提示、玩家指令、表情包、URL、代码块、角色名标签、楼层信息、括号里的纯动作说明。
 5. 保留真正应该被听见的对白、内心独白、喊话、低语、吐槽和拟声词；保留原来的称呼、语气词、口癖、错字和标点风格。
 6. 细粒度控制语气、情绪、音量、语速、停顿和呼吸，但不要每句话都堆满标注。每 1 到 3 句最多插入 1 个关键标注。
@@ -119,7 +119,7 @@ class MimoTtsProvider {
             {
                 id: 'natural-dialogue',
                 name: '自然对白',
-                prompt: '像真人聊天一样自然，标注从少但精准。优先保留角色原本语气，让停顿和轻微情绪自然出现。',
+                prompt: '像真人聊天一样自然，标注从少但精准。优先保留角色原本语气，让停顿和轻微情绪自然出现。可用（笑）（轻笑）（叹气）（停顿片刻）。',
             },
             {
                 id: 'intimate-whisper',
@@ -1012,7 +1012,7 @@ class MimoTtsProvider {
 
     async buildAudioCacheKey(inputText, voice, preparedText = null) {
         const material = JSON.stringify({
-            version: 10,
+            version: 11,
             inputText,
             preparedText,
             voice,
@@ -1279,6 +1279,7 @@ class MimoTtsProvider {
                         role: 'system',
                         content: [
                             this.settings.preprocessPrompt || this.defaultSettings.preprocessPrompt,
+                            this.buildAudioTagInstruction(),
                             this.buildStyleInstruction(),
                             this.buildInnerMonologueInstruction(),
                         ].filter(Boolean).join('\n\n'),
@@ -1371,6 +1372,13 @@ class MimoTtsProvider {
         }
 
         return lines.join('\n');
+    }
+
+    buildAudioTagInstruction() {
+        return `音频标签控制：
+1. 可以在完整朗读文本开头或句间插入括号标签，优先使用中文全角括号，例如：（东北话）（四川话）（河南话）（粤语）（孙悟空）（林黛玉）（唱歌）（小声）（轻声）（提高音量喊话）（语速加快）（语速放慢）（笑）（轻笑）（大笑）（冷笑）（苦笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（深呼吸）（急促呼吸）（咳嗽）（长叹一口气）（沉默片刻）。
+2. 方言、角色、唱歌这类整体风格标签应放在最开头；唱歌必须用（唱歌）开头。
+3. 情绪、呼吸、停顿、笑哭和语速标签可以插在对应句子前，但不要过度堆叠。`;
     }
 
     buildInnerMonologueInstruction() {
