@@ -12,6 +12,9 @@ class MimoTtsProvider {
     audioElement = document.createElement('audio');
     independentAudioElement = document.createElement('audio');
     independentObjectUrl = null;
+    activeIndependentButton = null;
+    independentPlaybackToken = 0;
+    independentPlaybackStopResolver = null;
     messageObserver = null;
     cacheDbPromise = null;
     lastPreprocessWarningAt = 0;
@@ -662,6 +665,27 @@ class MimoTtsProvider {
     }
 
     async playIndependentMessage(messageElement, button) {
+        if (button.classList.contains('mimo-tts-loading')) {
+            return;
+        }
+
+        if (button === this.activeIndependentButton) {
+            if (button.classList.contains('mimo-tts-playing')) {
+                this.pauseIndependentPlayback(button);
+                return;
+            }
+
+            if (button.classList.contains('mimo-tts-paused')) {
+                await this.resumeIndependentPlayback(button);
+                return;
+            }
+        }
+
+        if (button.mimoAudioBlobs?.length) {
+            await this.startIndependentPlayback(button, button.mimoAudioBlobs, button.mimoSourceText || this.getMessageSpeakText(messageElement));
+            return;
+        }
+
         const text = this.getMessageSpeakText(messageElement);
 
         if (!text) {
@@ -689,11 +713,12 @@ class MimoTtsProvider {
                 voiceName: voice.name,
                 voiceId: voice.voice_id,
             });
-            this.setButtonState(button, cacheHit ? 'cached' : 'ready');
-            if (cacheHit) {
-                this.ensureDownloadButton(button, blobs, text);
-            }
-            await this.playIndependentBlobs(blobs);
+            button.mimoAudioBlobs = blobs;
+            button.mimoSourceText = text;
+            button.dataset.mimoAudioReadyState = cacheHit ? 'cached' : 'generated';
+            this.ensureDownloadButton(button, blobs, text);
+            this.setButtonState(button, cacheHit ? 'cached' : 'generated');
+            await this.startIndependentPlayback(button, blobs, text);
         } finally {
             if (button.classList.contains('mimo-tts-loading')) {
                 this.setButtonState(button, 'ready');
@@ -702,10 +727,25 @@ class MimoTtsProvider {
     }
 
     setButtonState(button, state) {
-        button.classList.remove('mimo-tts-loading', 'mimo-tts-cached', 'fa-volume-high', 'fa-spinner', 'fa-spin', 'fa-rotate', 'fa-box-archive');
+        button.classList.remove(
+            'mimo-tts-loading',
+            'mimo-tts-cached',
+            'mimo-tts-generated',
+            'mimo-tts-playing',
+            'mimo-tts-paused',
+            'fa-volume-high',
+            'fa-spinner',
+            'fa-spin',
+            'fa-rotate',
+            'fa-box-archive',
+            'fa-circle-play',
+            'fa-pause',
+            'fa-play',
+        );
 
-        if (state !== 'cached') {
+        if (!['cached', 'generated', 'playing', 'paused'].includes(state)) {
             this.removeDownloadButton(button);
+            delete button.dataset.mimoAudioReadyState;
         }
 
         if (state === 'loading') {
@@ -715,8 +755,28 @@ class MimoTtsProvider {
         }
 
         if (state === 'cached') {
+            button.dataset.mimoAudioReadyState = 'cached';
             button.classList.add('mimo-tts-cached', 'fa-box-archive');
-            button.title = 'MiMo Advanced 播放缓存语音';
+            button.title = 'MiMo Advanced 已命中缓存，点击播放';
+            return;
+        }
+
+        if (state === 'generated') {
+            button.dataset.mimoAudioReadyState = 'generated';
+            button.classList.add('mimo-tts-generated', 'fa-circle-play');
+            button.title = 'MiMo Advanced 已生成语音，点击播放';
+            return;
+        }
+
+        if (state === 'playing') {
+            button.classList.add('mimo-tts-playing', 'fa-pause');
+            button.title = 'MiMo Advanced 正在播放，点击暂停';
+            return;
+        }
+
+        if (state === 'paused') {
+            button.classList.add('mimo-tts-paused', 'fa-play');
+            button.title = 'MiMo Advanced 已暂停，点击继续播放';
             return;
         }
 
@@ -851,27 +911,88 @@ class MimoTtsProvider {
     }
 
     async playIndependentBlobs(audioBlobs) {
-        this.stopIndependentAudio();
+        await this.startIndependentPlayback(null, audioBlobs, '');
+    }
 
-        for (const audioBlob of audioBlobs) {
-            await new Promise((resolve, reject) => {
-                this.releaseIndependentObjectUrl();
-                this.independentObjectUrl = URL.createObjectURL(audioBlob);
-                this.independentAudioElement.src = this.independentObjectUrl;
-                this.independentAudioElement.onended = () => {
-                    this.releaseIndependentObjectUrl();
-                    resolve();
-                };
-                this.independentAudioElement.onerror = () => {
-                    this.releaseIndependentObjectUrl();
-                    reject(new Error('独立音频播放失败。'));
-                };
-                this.independentAudioElement.play().catch((error) => {
-                    this.releaseIndependentObjectUrl();
-                    reject(error);
-                });
-            });
+    async startIndependentPlayback(button, audioBlobs, sourceText) {
+        if (!audioBlobs?.length) {
+            return;
         }
+
+        this.stopIndependentAudio();
+        const playbackToken = ++this.independentPlaybackToken;
+
+        if (button) {
+            button.mimoAudioBlobs = audioBlobs;
+            button.mimoSourceText = sourceText;
+            if (!button.dataset.mimoAudioReadyState) {
+                button.dataset.mimoAudioReadyState = 'generated';
+            }
+            this.ensureDownloadButton(button, audioBlobs, sourceText);
+            this.activeIndependentButton = button;
+            this.setButtonState(button, 'playing');
+        }
+
+        try {
+            for (const audioBlob of audioBlobs) {
+                if (playbackToken !== this.independentPlaybackToken) {
+                    return;
+                }
+
+                const result = await new Promise((resolve, reject) => {
+                    this.independentPlaybackStopResolver = () => resolve('stopped');
+                    this.releaseIndependentObjectUrl();
+                    this.independentObjectUrl = URL.createObjectURL(audioBlob);
+                    this.independentAudioElement.src = this.independentObjectUrl;
+                    this.independentAudioElement.onended = () => {
+                        this.independentPlaybackStopResolver = null;
+                        this.releaseIndependentObjectUrl();
+                        resolve('ended');
+                    };
+                    this.independentAudioElement.onerror = () => {
+                        this.independentPlaybackStopResolver = null;
+                        this.releaseIndependentObjectUrl();
+                        reject(new Error('独立音频播放失败。'));
+                    };
+                    this.independentAudioElement.play().catch((error) => {
+                        this.independentPlaybackStopResolver = null;
+                        this.releaseIndependentObjectUrl();
+                        reject(error);
+                    });
+                });
+
+                if (result === 'stopped') {
+                    return;
+                }
+            }
+        } finally {
+            if (playbackToken === this.independentPlaybackToken) {
+                this.releaseIndependentObjectUrl();
+                this.independentPlaybackStopResolver = null;
+                if (button && this.activeIndependentButton === button) {
+                    this.setButtonState(button, button.dataset.mimoAudioReadyState || 'generated');
+                    this.activeIndependentButton = null;
+                }
+            }
+        }
+    }
+
+    pauseIndependentPlayback(button) {
+        if (button !== this.activeIndependentButton || this.independentAudioElement.paused) {
+            return;
+        }
+
+        this.independentAudioElement.pause();
+        this.setButtonState(button, 'paused');
+    }
+
+    async resumeIndependentPlayback(button) {
+        if (button !== this.activeIndependentButton || !this.independentAudioElement.paused) {
+            return;
+        }
+
+        await this.independentAudioElement.play();
+        this.setButtonState(button, 'playing');
     }
 
     writeDebugLog(entry) {
@@ -918,11 +1039,11 @@ class MimoTtsProvider {
         if (!downloadButton) {
             downloadButton = document.createElement('div');
             downloadButton.className = 'mes_button mimo-tts-download-button fa-solid fa-download';
-            downloadButton.title = '下载缓存语音';
+            downloadButton.title = '下载生成语音';
             downloadButton.setAttribute('role', 'button');
             downloadButton.setAttribute('tabindex', '0');
             downloadButton.dataset.mimoDownloadFor = button.dataset.mimoButtonId;
-            button.after(downloadButton);
+            button.before(downloadButton);
         }
 
         downloadButton.onclick = (event) => {
@@ -974,9 +1095,20 @@ class MimoTtsProvider {
     }
 
     stopIndependentAudio() {
+        this.independentPlaybackToken += 1;
+        if (this.independentPlaybackStopResolver) {
+            this.independentPlaybackStopResolver();
+            this.independentPlaybackStopResolver = null;
+        }
         this.independentAudioElement.pause();
         this.independentAudioElement.currentTime = 0;
         this.releaseIndependentObjectUrl();
+
+        if (this.activeIndependentButton) {
+            const button = this.activeIndependentButton;
+            this.activeIndependentButton = null;
+            this.setButtonState(button, button.mimoAudioBlobs?.length ? (button.dataset.mimoAudioReadyState || 'generated') : 'ready');
+        }
     }
 
     releaseIndependentObjectUrl() {

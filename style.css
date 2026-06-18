@@ -33,6 +33,8 @@
 
 .mimo-tts-independent-button {
   cursor: pointer;
+  min-width: 1em;
+  text-align: center;
 }
 
 .mimo-tts-independent-button.mimo-tts-loading {
@@ -40,13 +42,25 @@
   pointer-events: none;
 }
 
+.mimo-tts-independent-button.mimo-tts-generated,
 .mimo-tts-independent-button.mimo-tts-cached {
   color: var(--SmartThemeQuoteColor);
+}
+
+.mimo-tts-independent-button.mimo-tts-playing {
+  color: var(--SmartThemeEmColor);
+}
+
+.mimo-tts-independent-button.mimo-tts-paused {
+  color: var(--SmartThemeQuoteColor);
+  opacity: 0.85;
 }
 
 .mimo-tts-download-button {
   cursor: pointer;
   color: var(--SmartThemeBodyColor);
+  min-width: 1em;
+  text-align: center;
 }
 
 .mimo-tts-download-button:hover {
