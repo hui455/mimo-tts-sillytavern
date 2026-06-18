@@ -53,6 +53,23 @@
   color: var(--SmartThemeQuoteColor);
 }
 
+.mimo-tts-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mimo-tts-file-row input[type="file"] {
+  display: none;
+}
+
+#mimo_tts_clone_voice_file_name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  opacity: 0.85;
+}
+
 #mimo_tts_debug_log {
   font-family: var(--monoFontFamily, monospace);
   white-space: pre-wrap;

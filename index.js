@@ -14,6 +14,7 @@ class MimoTtsProvider {
     independentObjectUrl = null;
     messageObserver = null;
     cacheDbPromise = null;
+    lastPreprocessWarningAt = 0;
 
     defaultSettings = {
         apiKey: '',
@@ -307,7 +308,11 @@ class MimoTtsProvider {
                         <h4>新增声音克隆</h4>
                         <input id="mimo_tts_clone_voice_name" type="text" class="text_pole" placeholder="显示名，例如：我的声音">
                         <textarea id="mimo_tts_clone_voice_prompt" class="text_pole" rows="3" placeholder="可选朗读风格，例如：自然清晰"></textarea>
-                        <input id="mimo_tts_clone_voice_file" type="file" class="text_pole" accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,.wav,.mp3">
+                        <div class="mimo-tts-file-row">
+                            <input id="mimo_tts_clone_voice_file" type="file" accept="audio/*,.wav,.mp3">
+                            <input id="mimo_tts_choose_clone_voice_file" type="button" class="menu_button" value="选择音频样本">
+                            <span id="mimo_tts_clone_voice_file_name">未选择文件</span>
+                        </div>
                         <input id="mimo_tts_add_clone_voice" type="button" class="menu_button" value="添加声音克隆">
                         <input id="mimo_tts_clear_clone_voice_form" type="button" class="menu_button" value="清空编辑">
                         <input id="mimo_tts_editing_clone_voice_id" type="hidden">
@@ -482,6 +487,8 @@ class MimoTtsProvider {
             toastr.error(error.message || String(error), providerName);
         }));
         $('#mimo_tts_clear_clone_voice_form').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearClonedVoiceForm());
+        $('#mimo_tts_choose_clone_voice_file').off('.mimoAdvanced').on('click.mimoAdvanced', () => $('#mimo_tts_clone_voice_file').trigger('click'));
+        $('#mimo_tts_clone_voice_file').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.updateCloneFileName());
     }
 
     bindDrawerFallback() {
@@ -1097,7 +1104,7 @@ class MimoTtsProvider {
 
     async buildAudioCacheKey(inputText, voice) {
         const material = JSON.stringify({
-            version: 5,
+            version: 6,
             inputText,
             voice,
             baseUrl: this.normalizeBaseUrl(this.settings.baseUrl),
@@ -1289,14 +1296,14 @@ class MimoTtsProvider {
             throw new Error('MiMo API Key is required.');
         }
 
-        const response = await fetch(`${this.normalizeBaseUrl(this.settings.baseUrl)}/chat/completions`, {
+        const response = await this.fetchWithTimeout(`${this.normalizeBaseUrl(this.settings.baseUrl)}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'api-key': this.settings.apiKey,
             },
             body: JSON.stringify(this.buildRequestBody(inputText, voice)),
-        });
+        }, 90000);
 
         const raw = await response.text();
         let payload = {};
@@ -1334,9 +1341,10 @@ class MimoTtsProvider {
                 return '';
             }
 
-            if (!this.isConservativePreprocessOutput(inputText, cleaned)) {
-                console.warn('MiMo TTS preprocessing changed dialogue content; rejected output', { inputText, cleaned });
-                toastr.warning('DeepSeek 返回内容改写了对白，已回退为未改写文本。', 'MiMo TTS');
+            const validation = this.validateConservativePreprocessOutput(inputText, cleaned);
+            if (!validation.ok) {
+                console.warn('MiMo TTS preprocessing changed dialogue content; rejected output', { inputText, cleaned, validation });
+                this.showThrottledPreprocessWarning('DeepSeek 返回内容疑似改写对白，已回退未改写文本继续合成。');
                 return inputText;
             }
 
@@ -1345,7 +1353,7 @@ class MimoTtsProvider {
             console.warn('MiMo TTS preprocessing failed', error);
 
             if (this.settings.preprocessFallbackToOriginal) {
-                toastr.warning('DeepSeek 预处理失败，已回退原文。', 'MiMo TTS');
+                this.showThrottledPreprocessWarning('DeepSeek 预处理失败，已回退原文继续合成。');
                 return inputText;
             }
 
@@ -1354,7 +1362,7 @@ class MimoTtsProvider {
     }
 
     async fetchPreprocessedText(inputText, voice) {
-        const response = await fetch(`${this.normalizeBaseUrl(this.settings.preprocessBaseUrl)}/chat/completions`, {
+        const response = await this.fetchWithTimeout(`${this.normalizeBaseUrl(this.settings.preprocessBaseUrl)}/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1382,7 +1390,7 @@ class MimoTtsProvider {
                     },
                 ],
             }),
-        });
+        }, 45000);
 
         const raw = await response.text();
         let payload = {};
@@ -1410,39 +1418,76 @@ class MimoTtsProvider {
         return String(output || '')
             .replace(/^```(?:text|txt|markdown)?/i, '')
             .replace(/```$/i, '')
+            .replace(/^\s*(?:处理后文本|处理结果|最终文本|输出|朗读文本|TTS文本)\s*[:：]\s*/i, '')
+            .replace(/^\s*[-*]\s+/gm, '')
             .replace(/^["'“”]+|["'“”]+$/g, '')
             .trim();
     }
 
     isConservativePreprocessOutput(inputText, outputText) {
+        return this.validateConservativePreprocessOutput(inputText, outputText).ok;
+    }
+
+    validateConservativePreprocessOutput(inputText, outputText) {
         const input = this.normalizeConservativeCompareText(inputText);
         const outputWithoutControls = this.normalizeConservativeCompareText(
             String(outputText || '')
                 .replace(/（[^）]*）/g, '')
-                .replace(/\([^)]*\)/g, ''),
+                .replace(/\([^)]*\)/g, '')
+                .replace(/\[[^\]]*]/g, ''),
         );
 
         if (!outputWithoutControls) {
-            return false;
+            return { ok: false, reason: 'empty_output_after_removing_control_tags', input, outputWithoutControls };
         }
 
         let cursor = 0;
         for (const char of outputWithoutControls) {
             cursor = input.indexOf(char, cursor);
             if (cursor === -1) {
-                return false;
+                return { ok: false, reason: 'output_char_not_found_in_input_order', missingChar: char, input, outputWithoutControls };
             }
             cursor += char.length;
         }
 
-        return true;
+        return { ok: true, input, outputWithoutControls };
     }
 
     normalizeConservativeCompareText(text) {
         return String(text || '')
             .replace(/\s+/g, '')
             .replace(/[“”「」『』"']/g, '')
+            .replace(/[，。！？、；：,.!?;:]/g, '')
             .trim();
+    }
+
+    showThrottledPreprocessWarning(message) {
+        const now = Date.now();
+        if (now - this.lastPreprocessWarningAt < 10000) {
+            return;
+        }
+
+        this.lastPreprocessWarningAt = now;
+        toastr.warning(message, 'MiMo TTS');
+    }
+
+    async fetchWithTimeout(url, options, timeoutMs) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            return await fetch(url, {
+                ...options,
+                signal: controller.signal,
+            });
+        } catch (error) {
+            if (error?.name === 'AbortError') {
+                throw new Error(`请求超时：${Math.round(timeoutMs / 1000)} 秒内没有响应。`);
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+        }
     }
 
     buildStyleInstruction() {
@@ -1754,11 +1799,18 @@ class MimoTtsProvider {
         $('#mimo_tts_editing_clone_voice_id').val(voice.voice_id || '');
         $('#mimo_tts_add_clone_voice').val('保存声音克隆');
         $('#mimo_tts_clone_voice_file').val('');
+        this.updateCloneFileName(voice.fileName ? `保留原样本：${voice.fileName}` : '保留原音频样本');
     }
 
     clearClonedVoiceForm() {
         $('#mimo_tts_clone_voice_name, #mimo_tts_clone_voice_prompt, #mimo_tts_editing_clone_voice_id, #mimo_tts_clone_voice_file').val('');
         $('#mimo_tts_add_clone_voice').val('添加声音克隆');
+        this.updateCloneFileName();
+    }
+
+    updateCloneFileName(fallbackText = '未选择文件') {
+        const file = document.querySelector('#mimo_tts_clone_voice_file')?.files?.[0] || null;
+        $('#mimo_tts_clone_voice_file_name').text(file?.name || fallbackText);
     }
 
     removeVoice(listName, voiceId) {
