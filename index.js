@@ -1243,8 +1243,12 @@ class MimoTtsProvider {
     cleanMessageText(text) {
         return this.removeThinkingText(String(text || ''))
             .replace(/```[\s\S]*?```/g, '')
+            .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+            .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+            .replace(/<[^>]+>/g, '')
             .replace(/\[[^\]]*?]\([^)]*?\)/g, '$1')
             .replace(/\{\{.*?\}\}/g, '')
+            .replace(/&[a-z]+;/gi, '')
             .replace(/\r\n?/g, '\n')
             .replace(/[ \t\f\v]+/g, ' ')
             .replace(/ *\n */g, '\n')
@@ -1274,7 +1278,7 @@ class MimoTtsProvider {
             : [];
 
         const material = JSON.stringify({
-            version: 20,
+            version: 21,
             inputText,
             preparedText,
             voice,
