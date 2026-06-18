@@ -33,6 +33,7 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 - 音色设计走 `mimo-v2.5-tts-voicedesign`，插件会把设计提示词放在 `user` 消息里，把朗读文本放在 `assistant` 消息里。
 - 可选启用 `DeepSeek 朗读前预处理`：先用 DeepSeek 去掉非对话内容，再把对白整理成带情绪、语速、停顿、呼吸、咳嗽、笑声等细粒度标注的 MiMo 朗读文本。
 - 角色音色映射、单条消息朗读、自动朗读和 `/speak` 都使用 SillyTavern 内置 TTS 功能。
+- 可选启用 `给每条助手消息添加独立播放按钮`：只给非用户消息加一个独立播放按钮，点击后临时预处理并播放该条消息，不进入 SillyTavern 内置 TTS 队列。
 
 如果你的 SillyTavern 已经内置官方 `MiMo` Provider，可以继续保留它；本插件会显示为 `MiMo Advanced`，主要用于 DeepSeek 表演预处理和自定义风格预设。
 
@@ -62,6 +63,8 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 ```text
 （紧张，深呼吸）呼……冷静，冷静。不就是一个面试吗……（语速加快，碎碎念）自我介绍已经背了五十遍了，应该没问题的。加油，你可以的……（小声）哎呀，领带歪没歪？
 ```
+
+预处理结果只用于当前这次 TTS 请求，不会写回聊天记录，也不会修改页面上的原消息。
 
 ## 音色设计示例
 

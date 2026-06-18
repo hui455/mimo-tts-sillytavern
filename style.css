@@ -30,3 +30,12 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+.mimo-tts-independent-button {
+  cursor: pointer;
+}
+
+.mimo-tts-independent-button.mimo-tts-loading {
+  opacity: 0.45;
+  pointer-events: none;
+}

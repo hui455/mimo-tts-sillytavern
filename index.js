@@ -1,10 +1,14 @@
 import { registerTtsProvider, saveTtsProviderSettings, getPreviewString, initVoiceMap } from '../../tts/index.js';
+import { getContext } from '../../../extensions.js';
 
 class MimoTtsProvider {
     settings;
     voices = [];
     separator = '。';
     audioElement = document.createElement('audio');
+    independentAudioElement = document.createElement('audio');
+    independentObjectUrl = null;
+    messageObserver = null;
 
     defaultSettings = {
         apiKey: '',
@@ -14,6 +18,8 @@ class MimoTtsProvider {
         format: 'wav',
         optimizeTextPreview: true,
         instruction: '自然、清晰、口语化，情绪贴合文本内容。',
+        independentMessageButtons: true,
+        independentVoiceId: 'preset:冰糖',
         preprocessEnabled: false,
         preprocessApiKey: '',
         preprocessBaseUrl: 'https://api.deepseek.com',
@@ -146,6 +152,17 @@ class MimoTtsProvider {
             </div>
             <hr>
             <div class="tts_block flexFlowColumn">
+                <h4>独立消息播放按钮</h4>
+                <label>
+                    <input id="mimo_tts_independent_buttons" type="checkbox">
+                    给每条助手消息添加独立播放按钮
+                </label>
+                <label for="mimo_tts_independent_voice">独立播放音色</label>
+                <select id="mimo_tts_independent_voice" class="text_pole"></select>
+                <input id="mimo_tts_independent_stop" type="button" class="menu_button" value="停止独立播放">
+            </div>
+            <hr>
+            <div class="tts_block flexFlowColumn">
                 <h4>DeepSeek 朗读前预处理</h4>
                 <label>
                     <input id="mimo_tts_preprocess_enabled" type="checkbox">
@@ -208,6 +225,9 @@ class MimoTtsProvider {
         $('#mimo_tts_instruction').val(this.settings.instruction);
         $('#mimo_tts_format').val(this.settings.format);
         $('#mimo_tts_optimize_text_preview').prop('checked', Boolean(this.settings.optimizeTextPreview));
+        $('#mimo_tts_independent_buttons').prop('checked', Boolean(this.settings.independentMessageButtons));
+        this.renderIndependentVoiceSelect();
+        $('#mimo_tts_independent_voice').val(this.settings.independentVoiceId);
         $('#mimo_tts_preprocess_enabled').prop('checked', Boolean(this.settings.preprocessEnabled));
         $('#mimo_tts_preprocess_api_key').val(this.settings.preprocessApiKey);
         $('#mimo_tts_preprocess_base_url').val(this.settings.preprocessBaseUrl);
@@ -224,17 +244,22 @@ class MimoTtsProvider {
         $('#mimo_tts_preprocess_api_key, #mimo_tts_preprocess_base_url, #mimo_tts_preprocess_model, #mimo_tts_preprocess_prompt').on('input', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_custom_style').on('input', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_temperature').on('input', () => this.onSettingsChange());
-        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_style').on('change', () => this.onSettingsChange());
+        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_style').on('change', () => this.onSettingsChange());
+        $('#mimo_tts_independent_stop').on('click', () => this.stopIndependentAudio());
         $('#mimo_tts_add_preset_voice').on('click', () => this.addPresetVoice());
         $('#mimo_tts_add_design_voice').on('click', () => this.addDesignedVoice());
 
         this.renderVoiceLists();
+        this.setupIndependentButtons();
         await this.checkReady();
         console.debug('MiMo TTS: settings loaded');
     }
 
     dispose() {
         this.audioElement.pause();
+        this.stopIndependentAudio();
+        this.messageObserver?.disconnect();
+        this.removeIndependentButtons();
     }
 
     onSettingsChange() {
@@ -245,6 +270,8 @@ class MimoTtsProvider {
         this.settings.instruction = String($('#mimo_tts_instruction').val() || '').trim();
         this.settings.format = String($('#mimo_tts_format').val() || 'wav');
         this.settings.optimizeTextPreview = Boolean($('#mimo_tts_optimize_text_preview').is(':checked'));
+        this.settings.independentMessageButtons = Boolean($('#mimo_tts_independent_buttons').is(':checked'));
+        this.settings.independentVoiceId = String($('#mimo_tts_independent_voice').val() || this.settings.independentVoiceId || 'preset:冰糖');
         this.settings.preprocessEnabled = Boolean($('#mimo_tts_preprocess_enabled').is(':checked'));
         this.settings.preprocessApiKey = String($('#mimo_tts_preprocess_api_key').val() || '').trim();
         this.settings.preprocessBaseUrl = String($('#mimo_tts_preprocess_base_url').val() || '').trim();
@@ -255,6 +282,7 @@ class MimoTtsProvider {
         this.settings.preprocessFallbackToOriginal = Boolean($('#mimo_tts_preprocess_fallback').is(':checked'));
         this.settings.preprocessPrompt = String($('#mimo_tts_preprocess_prompt').val() || '').trim();
         $('#mimo_tts_preprocess_temperature_output').text(Number(this.settings.preprocessTemperature).toFixed(2));
+        this.setupIndependentButtons();
         saveTtsProviderSettings();
     }
 
@@ -313,6 +341,148 @@ class MimoTtsProvider {
             toastr.error('MiMo TTS preview playback failed');
         };
         await this.audioElement.play();
+    }
+
+    setupIndependentButtons() {
+        if (!this.settings?.independentMessageButtons) {
+            this.removeIndependentButtons();
+            return;
+        }
+
+        this.decorateIndependentButtons();
+
+        if (!this.messageObserver) {
+            const chat = document.querySelector('#chat');
+            if (!chat) {
+                setTimeout(() => this.setupIndependentButtons(), 500);
+                return;
+            }
+
+            this.messageObserver = new MutationObserver(() => this.decorateIndependentButtons());
+            this.messageObserver.observe(chat, { childList: true, subtree: true });
+        }
+    }
+
+    removeIndependentButtons() {
+        document.querySelectorAll('.mimo-tts-independent-button').forEach((button) => button.remove());
+    }
+
+    decorateIndependentButtons() {
+        if (!this.settings?.independentMessageButtons) {
+            return;
+        }
+
+        document.querySelectorAll('#chat .mes').forEach((messageElement) => {
+            if (!this.isAssistantMessageElement(messageElement)) {
+                messageElement.querySelectorAll('.mimo-tts-independent-button').forEach((button) => button.remove());
+                return;
+            }
+
+            if (messageElement.querySelector('.mimo-tts-independent-button')) {
+                return;
+            }
+
+            const host = messageElement.querySelector('.mes_buttons, .extraMesButtons, .mes_block') || messageElement;
+            const button = document.createElement('div');
+            button.className = 'mes_button mimo-tts-independent-button fa-solid fa-volume-high';
+            button.title = 'MiMo Advanced 独立朗读此消息';
+            button.setAttribute('role', 'button');
+            button.setAttribute('tabindex', '0');
+            button.addEventListener('click', () => {
+                this.playIndependentMessage(messageElement, button).catch((error) => {
+                    console.error('MiMo independent playback failed', error);
+                    toastr.error(error.message || String(error), 'MiMo Advanced');
+                });
+            });
+            button.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    button.click();
+                }
+            });
+            host.append(button);
+        });
+    }
+
+    isAssistantMessageElement(messageElement) {
+        const id = Number(messageElement.getAttribute('mesid'));
+        const message = Number.isFinite(id) ? getContext()?.chat?.[id] : null;
+
+        if (message) {
+            return !message.is_user && !message.is_system;
+        }
+
+        return !messageElement.classList.contains('is_user') && !messageElement.classList.contains('user_mes');
+    }
+
+    async playIndependentMessage(messageElement, button) {
+        const text = this.cleanMessageText(messageElement.querySelector('.mes_text')?.innerText || '');
+
+        if (!text) {
+            throw new Error('这条消息没有可朗读文本。');
+        }
+
+        button.classList.add('mimo-tts-loading');
+
+        try {
+            const voice = await this.getIndependentVoice();
+            const preparedText = await this.preprocessText(text, voice);
+            const response = await this.fetchTtsGeneration(preparedText, voice);
+            const audioBlob = await response.blob();
+            await this.playIndependentBlob(audioBlob);
+        } finally {
+            button.classList.remove('mimo-tts-loading');
+        }
+    }
+
+    async getIndependentVoice() {
+        const voices = await this.fetchTtsVoiceObjects();
+        const selected = voices.find((voice) => voice.voice_id === this.settings.independentVoiceId || voice.name === this.settings.independentVoiceId);
+
+        if (selected) {
+            return selected;
+        }
+
+        if (voices[0]) {
+            this.settings.independentVoiceId = voices[0].voice_id;
+            return voices[0];
+        }
+
+        throw new Error('没有可用的 MiMo 音色。');
+    }
+
+    async playIndependentBlob(audioBlob) {
+        this.stopIndependentAudio();
+        this.independentObjectUrl = URL.createObjectURL(audioBlob);
+        this.independentAudioElement.src = this.independentObjectUrl;
+        this.independentAudioElement.onended = () => this.releaseIndependentObjectUrl();
+        this.independentAudioElement.onerror = () => {
+            this.releaseIndependentObjectUrl();
+            toastr.error('独立音频播放失败。', 'MiMo Advanced');
+        };
+        await this.independentAudioElement.play();
+    }
+
+    stopIndependentAudio() {
+        this.independentAudioElement.pause();
+        this.independentAudioElement.currentTime = 0;
+        this.releaseIndependentObjectUrl();
+    }
+
+    releaseIndependentObjectUrl() {
+        if (this.independentObjectUrl) {
+            URL.revokeObjectURL(this.independentObjectUrl);
+            this.independentObjectUrl = null;
+        }
+    }
+
+    cleanMessageText(text) {
+        return String(text || '')
+            .replace(/```[\s\S]*?```/g, '')
+            .replace(/\[[^\]]*?]\([^)]*?\)/g, '$1')
+            .replace(/\{\{.*?\}\}/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 
     async fetchTtsGeneration(inputText, voice) {
@@ -614,6 +784,7 @@ class MimoTtsProvider {
     renderVoiceLists() {
         this.renderVoiceList('#mimo_tts_preset_voice_list', 'presetVoices');
         this.renderVoiceList('#mimo_tts_design_voice_list', 'designedVoices');
+        this.renderIndependentVoiceSelect();
     }
 
     renderStylePresetSelect() {
@@ -622,6 +793,29 @@ class MimoTtsProvider {
 
         for (const preset of this.settings.preprocessStylePresets) {
             select.append($('<option></option>').val(preset.id).text(preset.name));
+        }
+    }
+
+    renderIndependentVoiceSelect() {
+        const select = $('#mimo_tts_independent_voice');
+
+        if (!select.length) {
+            return;
+        }
+
+        const currentValue = this.settings.independentVoiceId;
+        const voices = [...this.settings.presetVoices, ...this.settings.designedVoices];
+        select.empty();
+
+        for (const voice of voices) {
+            select.append($('<option></option>').val(voice.voice_id).text(voice.name));
+        }
+
+        if (voices.some((voice) => voice.voice_id === currentValue)) {
+            select.val(currentValue);
+        } else if (voices[0]) {
+            this.settings.independentVoiceId = voices[0].voice_id;
+            select.val(voices[0].voice_id);
         }
     }
 
