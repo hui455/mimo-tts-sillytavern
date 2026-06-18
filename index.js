@@ -51,7 +51,6 @@ class MimoTtsProvider {
 2. 绝对不能改写、润色、扩写、删改或替换原对白文字本身；对白内容必须从输入里原样截取。
 3. 你只允许做当前模式要求的处理：整理正文叙述；或为 MiMo 生成自然语言控制说明；或在对白前/对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（轻笑）（大笑）（冷笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
 4. 去除非对话内容：系统提示、玩家指令、URL、代码块、角色名标签、楼层信息、表情包、纯括号动作说明（他笑了一下）（她点点头）。
-5. 正文叙述的处理方式请严格遵循后续"本章处理规则"中的指示。
 6. 保留真正应该被听见的对白、内心独白、喊话、低语和吐槽；保留称呼、口癖、错字和标点风格；保留句子间的正常感叹（呀、呢、吧、嘛 等句尾语气助词）。
 7. 删除或转换纯呻吟/娇喘/浪叫/喘息类拟声词（如：嗯～、啊～、哈啊、咕齁、咿咿、嗯嗯啊啊 等成片无实际语义的叫声），改用 MiMo 括号标注表现情绪，例如转换"嗯❤️～哈啊～"为（满足的轻哼）（意乱情迷的喘息）。禁止 MiMo 直接朗读这些无语义拟声词。
 8. 删除插入在中文句子中间的 emoji（❤️♡～等）和非文字符号。
@@ -1497,12 +1496,12 @@ class MimoTtsProvider {
                     {
                         role: 'system',
                         content: [
+                            this.buildNarrativeModeInstruction(),
                             this.settings.preprocessPrompt || this.defaultSettings.preprocessPrompt,
                             this.buildRelationshipVoiceInstruction(),
                             this.buildPreprocessControlModeInstruction(voice),
                             this.buildStyleInstruction(),
                             this.buildInnerMonologueInstruction(),
-                            this.buildNarrativeModeInstruction(),
                         ].filter(Boolean).join('\n\n'),
                     },
                     {
@@ -1733,14 +1732,14 @@ class MimoTtsProvider {
         const mode = this.settings.preprocessNarrativeMode || 'remove';
 
         if (mode === 'remove') {
-            return '本章处理规则：删除正文中所有非对话内容——场景描写、动作描写、旁白、环境描写，仅保留角色说出口的对白和内心独白。';
+            return '重要：正文叙述处理规则。必须删除正文中所有非对话内容——场景描写、动作描写、旁白、环境描写，仅保留角色说出口的对白和内心独白。此规则优先级最高，覆盖其他保留叙述的指示。';
         }
 
         if (mode === 'keep') {
-            return '本章处理规则：保留所有正文内容完整输出，包括场景描写、动作描写、旁白、环境描写。原文有什么就输出什么，不做任何删减浓缩。';
+            return '重要：正文叙述处理规则。必须保留所有正文内容完整输出，包括场景描写、动作描写、旁白、环境描写。原文有什么就输出什么，不做任何删减浓缩。此规则优先级最高，覆盖其他删除叙述的指示。';
         }
 
-        return '本章处理规则：正文中的场景描写、动作描写、旁白不要直接删除，而是浓缩为一句简短自然的衔接语，保留在对白之间作为过渡。例如原文"她慢慢走到窗边，手指在玻璃上划过，沉默了很久"可浓缩为"她走到窗边，沉默了一会儿"。';
+        return '重要：正文叙述处理规则。正文中的场景描写、动作描写、旁白不要删除，而是浓缩为一句简短自然的衔接语保留在对白之间。例如原文"她慢慢走到窗边，手指在玻璃上划过，沉默了很久"可浓缩为"她走到窗边，沉默了一会儿"。此规则优先级最高。';
     }
 
     getStylePreset(id) {
