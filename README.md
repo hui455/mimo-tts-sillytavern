@@ -21,13 +21,12 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 
 ## 配置
 
-1. 打开 SillyTavern 的扩展面板，启用内置 `TTS` 扩展。
-2. 在 TTS Provider 下拉里选择 `MiMo Advanced`。
-3. 填写 `MiMo API Key`。
-4. 保持默认 Base URL：`https://api.xiaomimimo.com/v1`。
-5. 点击 TTS 的刷新按钮，让酒馆重新加载音色列表。
+1. 打开 SillyTavern 的扩展面板，找到 `MiMo Advanced TTS`。
+2. 填写 `MiMo API Key`。
+3. 保持默认 Base URL：`https://api.xiaomimimo.com/v1`。
+4. 按需设置独立播放音色、试音文本、DeepSeek 预处理和缓存。
 
-本插件的设置挂在 SillyTavern 内置 `TTS` 扩展的 Provider 设置里。只有当 `TTS Provider` 选择为 `MiMo Advanced` 时，MiMo Advanced 的 API Key、DeepSeek 预处理、独立播放按钮、缓存等设置才会显示。
+独立消息播放按钮不依赖 SillyTavern 内置 `TTS` 扩展是否启用，也不受系统 TTS Provider、播放速率、队列等设置影响。`MiMo Advanced` 仍会注册成一个可选 TTS Provider，只有你想用酒馆原生 TTS 队列、voice map、`/speak` 时才需要在内置 TTS 里选择它。
 
 ## 使用
 
@@ -38,6 +37,7 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 - 可选启用 `给每条助手消息添加独立播放按钮`：只给非用户消息加一个独立播放按钮，点击后临时预处理并播放该条消息，不进入 SillyTavern 内置 TTS 队列。
 - 独立播放会自动缓存最近 5 条语音。缓存保存在浏览器 IndexedDB，命中缓存时不会重复请求 DeepSeek 或 MiMo；超过 5 条会自动删除最旧缓存。
 - 朗读前会先过滤常见思考/推理内容，例如 `<think>...</think>`、`<thinking>...</thinking>`、`<reasoning>...</reasoning>`、`思考：...`、`推理过程：...`，再进入 DeepSeek 预处理或 MiMo 合成。
+- 可以用 `试听当前独立播放音色` 测试当前音色，也可以在音色列表里点击单个音色旁边的 `试听`。
 
 如果你的 SillyTavern 已经内置官方 `MiMo` Provider，可以继续保留它；本插件会显示为 `MiMo Advanced`，主要用于 DeepSeek 表演预处理和自定义风格预设。
 

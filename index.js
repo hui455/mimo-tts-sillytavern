@@ -1,5 +1,9 @@
-import { registerTtsProvider, saveTtsProviderSettings, getPreviewString, initVoiceMap } from '../../tts/index.js';
-import { getContext } from '../../../extensions.js';
+import { registerTtsProvider, getPreviewString, initVoiceMap } from '../../tts/index.js';
+import { extension_settings, getContext } from '../../../extensions.js';
+import { saveSettingsDebounced } from '../../../../script.js';
+
+const extensionName = 'mimo-tts-sillytavern';
+const providerName = 'MiMo Advanced';
 
 class MimoTtsProvider {
     settings;
@@ -23,6 +27,7 @@ class MimoTtsProvider {
         independentVoiceId: 'preset:冰糖',
         independentCacheEnabled: true,
         independentCacheLimit: 5,
+        previewText: '你好，这是 MiMo Advanced 的音色试听。今天也辛苦了，先放松一下吧。',
         preprocessEnabled: false,
         preprocessApiKey: '',
         preprocessBaseUrl: 'https://api.deepseek.com',
@@ -119,7 +124,16 @@ class MimoTtsProvider {
 
     get settingsHtml() {
         return `
-        <div class="mimo-tts-provider-settings">
+        <div id="mimo_tts_provider_notice" class="mimo-tts-provider-settings">
+            <p>MiMo Advanced 的独立播放按钮、API Key、DeepSeek 预处理和缓存设置在普通扩展设置页中，不受系统 TTS 设置影响。</p>
+        </div>
+        `;
+    }
+
+    get settingsFormHtml() {
+        return `
+        <div id="mimo_tts_extension_settings" class="mimo-tts-provider-settings">
+            <h3>MiMo Advanced TTS</h3>
             <div class="tts_block">
                 <label for="mimo_tts_api_key">MiMo API Key</label>
                 <input id="mimo_tts_api_key" type="password" class="text_pole" autocomplete="off" placeholder="从 MiMo Console 获取">
@@ -162,6 +176,9 @@ class MimoTtsProvider {
                 </label>
                 <label for="mimo_tts_independent_voice">独立播放音色</label>
                 <select id="mimo_tts_independent_voice" class="text_pole"></select>
+                <label for="mimo_tts_preview_text">试音文本</label>
+                <textarea id="mimo_tts_preview_text" class="text_pole" rows="3"></textarea>
+                <input id="mimo_tts_preview_selected_voice" type="button" class="menu_button" value="试听当前独立播放音色">
                 <label>
                     <input id="mimo_tts_independent_cache" type="checkbox">
                     自动缓存最近 5 条语音
@@ -215,16 +232,65 @@ class MimoTtsProvider {
         `;
     }
 
-    async loadSettings(settings) {
-        this.settings = structuredClone(this.defaultSettings);
+    ensureExtensionSettings(providerSettings = {}) {
+        const legacySettings = extension_settings.tts?.[providerName] || {};
+        const existingSettings = extension_settings[extensionName] || {};
+        const mergedSettings = {
+            ...structuredClone(this.defaultSettings),
+            ...legacySettings,
+            ...providerSettings,
+            ...existingSettings,
+        };
 
-        for (const key in settings) {
-            if (key in this.settings) {
-                this.settings[key] = settings[key];
-            }
+        if (!extension_settings[extensionName]) {
+            extension_settings[extensionName] = mergedSettings;
+        } else {
+            Object.assign(extension_settings[extensionName], mergedSettings);
         }
 
+        this.settings = extension_settings[extensionName];
         this.normalizeVoiceIds();
+        return this.settings;
+    }
+
+    async loadSettings(settings) {
+        this.ensureExtensionSettings(settings);
+
+        try {
+            await this.checkReady();
+        } catch (error) {
+            console.debug('MiMo TTS provider loaded, provider not ready yet', error);
+        }
+    }
+
+    async initStandaloneSettings() {
+        this.ensureExtensionSettings();
+
+        if (!document.querySelector('#mimo_tts_extension_settings')) {
+            const settingsRoot = document.querySelector('#extensions_settings');
+            if (!settingsRoot) {
+                setTimeout(() => this.initStandaloneSettings(), 500);
+                return;
+            }
+            settingsRoot.insertAdjacentHTML('beforeend', this.settingsFormHtml);
+        }
+
+        this.populateSettingsForm();
+        this.bindSettingsEvents();
+        this.renderVoiceLists();
+        this.setupIndependentButtons();
+
+        try {
+            await this.checkReady();
+        } catch (error) {
+            console.debug('MiMo Advanced standalone settings loaded, provider not ready yet', error);
+        }
+    }
+
+    populateSettingsForm() {
+        if (!document.querySelector('#mimo_tts_api_key')) {
+            return;
+        }
 
         $('#mimo_tts_api_key').val(this.settings.apiKey);
         $('#mimo_tts_base_url').val(this.settings.baseUrl);
@@ -236,6 +302,7 @@ class MimoTtsProvider {
         $('#mimo_tts_independent_buttons').prop('checked', Boolean(this.settings.independentMessageButtons));
         this.renderIndependentVoiceSelect();
         $('#mimo_tts_independent_voice').val(this.settings.independentVoiceId);
+        $('#mimo_tts_preview_text').val(this.settings.previewText);
         $('#mimo_tts_independent_cache').prop('checked', Boolean(this.settings.independentCacheEnabled));
         $('#mimo_tts_preprocess_enabled').prop('checked', Boolean(this.settings.preprocessEnabled));
         $('#mimo_tts_preprocess_api_key').val(this.settings.preprocessApiKey);
@@ -248,27 +315,22 @@ class MimoTtsProvider {
         $('#mimo_tts_preprocess_custom_style').val(this.settings.preprocessCustomStyle);
         $('#mimo_tts_preprocess_fallback').prop('checked', Boolean(this.settings.preprocessFallbackToOriginal));
         $('#mimo_tts_preprocess_prompt').val(this.settings.preprocessPrompt);
+    }
 
-        $('#mimo_tts_api_key, #mimo_tts_base_url, #mimo_tts_preset_model, #mimo_tts_voice_design_model, #mimo_tts_instruction').on('input', () => this.onSettingsChange());
-        $('#mimo_tts_preprocess_api_key, #mimo_tts_preprocess_base_url, #mimo_tts_preprocess_model, #mimo_tts_preprocess_prompt').on('input', () => this.onSettingsChange());
-        $('#mimo_tts_preprocess_custom_style').on('input', () => this.onSettingsChange());
-        $('#mimo_tts_preprocess_temperature').on('input', () => this.onSettingsChange());
-        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_independent_cache, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_style').on('change', () => this.onSettingsChange());
-        $('#mimo_tts_independent_stop').on('click', () => this.stopIndependentAudio());
-        $('#mimo_tts_clear_cache').on('click', () => this.clearAudioCacheWithToast());
-        $('#mimo_tts_add_preset_voice').on('click', () => this.addPresetVoice());
-        $('#mimo_tts_add_design_voice').on('click', () => this.addDesignedVoice());
-
-        this.renderVoiceLists();
-        this.setupIndependentButtons();
-
-        try {
-            await this.checkReady();
-        } catch (error) {
-            console.debug('MiMo TTS: settings loaded, provider not ready yet', error);
-        }
-
-        console.debug('MiMo TTS: settings loaded');
+    bindSettingsEvents() {
+        $('#mimo_tts_api_key, #mimo_tts_base_url, #mimo_tts_preset_model, #mimo_tts_voice_design_model, #mimo_tts_instruction, #mimo_tts_preview_text').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_preprocess_api_key, #mimo_tts_preprocess_base_url, #mimo_tts_preprocess_model, #mimo_tts_preprocess_prompt').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_preprocess_custom_style').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_preprocess_temperature').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_independent_cache, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_style').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_independent_stop').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.stopIndependentAudio());
+        $('#mimo_tts_clear_cache').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearAudioCacheWithToast());
+        $('#mimo_tts_preview_selected_voice').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.previewSelectedIndependentVoice().catch((error) => {
+            console.error('MiMo Advanced preview failed', error);
+            toastr.error(error.message || String(error), 'MiMo Advanced');
+        }));
+        $('#mimo_tts_add_preset_voice').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.addPresetVoice());
+        $('#mimo_tts_add_design_voice').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.addDesignedVoice());
     }
 
     dispose() {
@@ -289,6 +351,7 @@ class MimoTtsProvider {
         this.settings.independentMessageButtons = Boolean($('#mimo_tts_independent_buttons').is(':checked'));
         this.settings.independentVoiceId = String($('#mimo_tts_independent_voice').val() || this.settings.independentVoiceId || 'preset:冰糖');
         this.settings.independentCacheEnabled = Boolean($('#mimo_tts_independent_cache').is(':checked'));
+        this.settings.previewText = String($('#mimo_tts_preview_text').val() || '').trim() || this.defaultSettings.previewText;
         this.settings.preprocessEnabled = Boolean($('#mimo_tts_preprocess_enabled').is(':checked'));
         this.settings.preprocessApiKey = String($('#mimo_tts_preprocess_api_key').val() || '').trim();
         this.settings.preprocessBaseUrl = String($('#mimo_tts_preprocess_base_url').val() || '').trim();
@@ -300,7 +363,7 @@ class MimoTtsProvider {
         this.settings.preprocessPrompt = String($('#mimo_tts_preprocess_prompt').val() || '').trim();
         $('#mimo_tts_preprocess_temperature_output').text(Number(this.settings.preprocessTemperature).toFixed(2));
         this.setupIndependentButtons();
-        saveTtsProviderSettings();
+        saveSettingsDebounced();
     }
 
     async checkReady() {
@@ -523,6 +586,17 @@ class MimoTtsProvider {
         }
 
         throw new Error('没有可用的 MiMo 音色。');
+    }
+
+    async previewSelectedIndependentVoice() {
+        const voice = await this.getIndependentVoice();
+        await this.previewVoiceObject(voice);
+    }
+
+    async previewVoiceObject(voice) {
+        const text = this.cleanMessageText(this.settings.previewText || this.defaultSettings.previewText);
+        const audioBlob = await this.getOrCreateAudioBlob(text, voice);
+        await this.playIndependentBlob(audioBlob);
     }
 
     async playIndependentBlob(audioBlob) {
@@ -1043,7 +1117,7 @@ class MimoTtsProvider {
 
     afterVoiceListChange() {
         this.renderVoiceLists();
-        saveTtsProviderSettings();
+        saveSettingsDebounced();
         initVoiceMap().catch((error) => console.warn('MiMo TTS voice map refresh failed', error));
     }
 
@@ -1099,13 +1173,21 @@ class MimoTtsProvider {
         for (const voice of this.settings[listName]) {
             const row = $('<div></div>').addClass('mimo-tts-list-item');
             const label = $('<span></span>').text(`${voice.name} (${voice.voice_id})`);
+            const previewButton = $('<button></button>')
+                .addClass('menu_button')
+                .attr('type', 'button')
+                .text('试听')
+                .on('click', () => this.previewVoiceObject(voice).catch((error) => {
+                    console.error('MiMo Advanced voice preview failed', error);
+                    toastr.error(error.message || String(error), providerName);
+                }));
             const removeButton = $('<button></button>')
                 .addClass('menu_button')
                 .attr('type', 'button')
                 .text('删除')
                 .on('click', () => this.removeVoice(listName, voice.voice_id));
 
-            row.append(label, removeButton);
+            row.append(label, previewButton, removeButton);
             container.append(row);
         }
     }
@@ -1122,4 +1204,13 @@ class MimoTtsProvider {
     }
 }
 
-registerTtsProvider('MiMo Advanced', MimoTtsProvider);
+const standaloneMimoAdvanced = new MimoTtsProvider();
+
+jQuery(() => {
+    standaloneMimoAdvanced.initStandaloneSettings().catch((error) => {
+        console.error('MiMo Advanced standalone init failed', error);
+        toastr.error(error.message || String(error), providerName);
+    });
+});
+
+registerTtsProvider(providerName, MimoTtsProvider);
