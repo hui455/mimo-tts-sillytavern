@@ -27,7 +27,7 @@ class MimoTtsProvider {
         independentMessageButtons: true,
         independentVoiceId: 'preset:冰糖',
         dualSpeakerEnabled: true,
-        secondVoiceId: 'design:young-male',
+        secondVoiceId: 'design:sweet-teen-girl',
         independentCacheEnabled: true,
         independentCacheLimit: 5,
         debugLogEnabled: true,
@@ -72,12 +72,6 @@ class MimoTtsProvider {
                 prompt: 'Young Chinese female, warm and confident, clear and soothing. Speaks slowly and naturally like a late-night radio host.',
             },
             {
-                name: '设计音色-低沉男旁白',
-                voice_id: 'design:deep-male-narrator',
-                lang: 'zh-CN',
-                prompt: 'Deep magnetic middle-aged male narrator, calm and deliberate. Slow, steady rhythm, suitable for documentary narration.',
-            },
-            {
                 name: '设计音色-傲娇少女',
                 voice_id: 'design:tsundere-girl',
                 lang: 'zh-CN',
@@ -112,12 +106,6 @@ class MimoTtsProvider {
                 voice_id: 'design:calm-older-sister',
                 lang: 'zh-CN',
                 prompt: 'Mature Chinese female voice, calm, clean, and controlled. Steady medium-slow pace, slightly cold and authoritative.',
-            },
-            {
-                name: '设计音色-少年感男声',
-                voice_id: 'design:young-male',
-                lang: 'zh-CN',
-                prompt: 'Young Chinese male voice, fresh and sincere. Natural medium pace, clear pronunciation, suitable for daily dialogue.',
             },
             {
                 name: '设计音色-ASMR耳语',
@@ -349,6 +337,7 @@ class MimoTtsProvider {
 
         this.settings = extension_settings[extensionName];
         this.mergeDefaultVoiceCatalogs();
+        this.migrateDesignedVoicesToFemaleDefaults();
         this.normalizeVoiceIds();
         return this.settings;
     }
@@ -371,6 +360,29 @@ class MimoTtsProvider {
         }
 
         return merged;
+    }
+
+    migrateDesignedVoicesToFemaleDefaults() {
+        if (this.settings.designedVoiceCatalogMode === 'female-defaults-v1') {
+            return;
+        }
+
+        const defaultFemaleIds = new Set(this.defaultSettings.designedVoices.map((voice) => voice.voice_id));
+        const removedVoiceIds = new Set(
+            this.settings.designedVoices
+                .filter((voice) => !defaultFemaleIds.has(voice.voice_id))
+                .map((voice) => voice.voice_id),
+        );
+        this.settings.designedVoices = structuredClone(this.defaultSettings.designedVoices);
+        this.settings.designedVoiceCatalogMode = 'female-defaults-v1';
+
+        if (removedVoiceIds.has(this.settings.independentVoiceId)) {
+            this.settings.independentVoiceId = this.defaultSettings.independentVoiceId;
+        }
+
+        if (removedVoiceIds.has(this.settings.secondVoiceId)) {
+            this.settings.secondVoiceId = this.defaultSettings.secondVoiceId;
+        }
     }
 
     async loadSettings(settings) {
@@ -1079,7 +1091,7 @@ class MimoTtsProvider {
 
     async buildAudioCacheKey(inputText, voice) {
         const material = JSON.stringify({
-            version: 3,
+            version: 4,
             inputText,
             voice,
             baseUrl: this.normalizeBaseUrl(this.settings.baseUrl),
