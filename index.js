@@ -1104,7 +1104,7 @@ class MimoTtsProvider {
 
     async buildAudioCacheKey(inputText, voice) {
         const material = JSON.stringify({
-            version: 6,
+            version: 8,
             inputText,
             voice,
             baseUrl: this.normalizeBaseUrl(this.settings.baseUrl),
@@ -1341,19 +1341,12 @@ class MimoTtsProvider {
                 return '';
             }
 
-            const validation = this.validateConservativePreprocessOutput(inputText, cleaned);
-            if (!validation.ok) {
-                console.warn('MiMo TTS preprocessing changed dialogue content; rejected output', { inputText, cleaned, validation });
-                this.showThrottledPreprocessWarning('DeepSeek 返回内容疑似改写对白，已回退未改写文本继续合成。');
-                return inputText;
-            }
-
             return cleaned;
         } catch (error) {
             console.warn('MiMo TTS preprocessing failed', error);
 
             if (this.settings.preprocessFallbackToOriginal) {
-                this.showThrottledPreprocessWarning('DeepSeek 预处理失败，已回退原文继续合成。');
+                this.showThrottledPreprocessWarning('DeepSeek 预处理失败，已使用原文继续合成。');
                 return inputText;
             }
 
@@ -1456,8 +1449,9 @@ class MimoTtsProvider {
     normalizeConservativeCompareText(text) {
         return String(text || '')
             .replace(/\s+/g, '')
-            .replace(/[“”「」『』"']/g, '')
+            .replace(/[“”「」『』《》〈〉""'`]/g, '')
             .replace(/[，。！？、；：,.!?;:]/g, '')
+            .replace(/[…⋯·・~～\-—–―_＿|｜\\/]/g, '')
             .trim();
     }
 
