@@ -1091,7 +1091,6 @@ class MimoTtsProvider {
         const narrativeMode = this.settings.preprocessNarrativeMode || 'remove';
         const promptLabel = narrativeMode === 'keep' ? '保留叙述' : '删除叙述';
         const effectivePrompt = this.getEffectivePreprocessPrompt();
-        const promptPreview = effectivePrompt ? effectivePrompt.replace(/\n/g, ' ').slice(0, 200) : '';
 
         const lines = [
             `时间：${new Date().toLocaleString()}`,
@@ -1112,7 +1111,8 @@ class MimoTtsProvider {
             `背景声：${this.settings.backgroundAudioEnabled ? '启用' : '关闭'}`,
             `原文长度：${entry.originalText ? entry.originalText.length : 0} 字`,
             `处理后长度：${entry.processedText ? entry.processedText.length : 0} 字`,
-            `系统提示词前200字：${promptPreview}`,
+            '=== 完整系统提示词 ===',
+            effectivePrompt || '',
             '原文：',
             entry.originalText || '',
             '处理后：',
