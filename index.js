@@ -40,14 +40,15 @@ class MimoTtsProvider {
         preprocessTemperature: 0.2,
         preprocessFallbackToOriginal: true,
         preprocessKeepInnerMonologue: true,
+        preprocessControlMode: 'audio-tags',
         preprocessStyle: 'natural-dialogue',
         preprocessCustomStyle: '',
         preprocessPrompt: `你是 SillyTavern 角色对白的 TTS 表演脚本整理器。你的任务是把输入段落整理成适合 MiMo TTS 朗读的中文表演文本。
 
 规则：
-1. 只输出最终要朗读的文本，不要解释，不要 Markdown，不要 JSON。
+1. 只输出当前控制模式要求的结果，不要解释，不要 Markdown；只有“自然语言控制”模式允许输出指定 JSON。
 2. 绝对不能改写、润色、扩写、删改或替换原对白文字本身；对白内容必须从输入里原样截取。
-3. 你只允许做两类事：裁掉非对话内容；在对白前或对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（小声）（压低声音）（轻笑）（大笑）（冷笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
+3. 你只允许做当前模式要求的处理：裁掉非对话内容；或为 MiMo 生成自然语言控制说明；或在对白前/对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（小声）（压低声音）（轻笑）（大笑）（冷笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
 4. 去除非对话内容：旁白、动作描写、场景描写、系统提示、玩家指令、表情包、URL、代码块、角色名标签、楼层信息、括号里的纯动作说明。
 5. 保留真正应该被听见的对白、内心独白、喊话、低语、吐槽和拟声词；保留原来的称呼、语气词、口癖、错字和标点风格。
 6. 细粒度控制语气、情绪、音量、语速、停顿和呼吸，但不要每句话都堆满标注。每 1 到 3 句最多插入 1 个关键标注。
@@ -215,6 +216,11 @@ class MimoTtsProvider {
                         <input id="mimo_tts_preprocess_model" type="text" class="text_pole">
                         <label for="mimo_tts_preprocess_temperature">Temperature: <span id="mimo_tts_preprocess_temperature_output"></span></label>
                         <input id="mimo_tts_preprocess_temperature" type="range" min="0" max="1" step="0.05">
+                        <label for="mimo_tts_preprocess_control_mode">MiMo 控制模式</label>
+                        <select id="mimo_tts_preprocess_control_mode" class="text_pole">
+                            <option value="audio-tags">音频标签控制（写入 assistant 文本）</option>
+                            <option value="natural-language">自然语言控制（写入 user 指令）</option>
+                        </select>
                         <label for="mimo_tts_preprocess_style">表演风格预设</label>
                         <select id="mimo_tts_preprocess_style" class="text_pole"></select>
                         <label>
@@ -374,6 +380,7 @@ class MimoTtsProvider {
         $('#mimo_tts_preprocess_model').val(this.settings.preprocessModel);
         $('#mimo_tts_preprocess_temperature').val(this.settings.preprocessTemperature);
         $('#mimo_tts_preprocess_temperature_output').text(Number(this.settings.preprocessTemperature).toFixed(2));
+        $('#mimo_tts_preprocess_control_mode').val(this.getPreprocessControlMode());
         this.renderStylePresetSelect();
         $('#mimo_tts_preprocess_style').val(this.settings.preprocessStyle);
         $('#mimo_tts_preprocess_keep_inner_monologue').prop('checked', Boolean(this.settings.preprocessKeepInnerMonologue));
@@ -387,7 +394,7 @@ class MimoTtsProvider {
         $('#mimo_tts_preprocess_api_key, #mimo_tts_preprocess_base_url, #mimo_tts_preprocess_model, #mimo_tts_preprocess_prompt').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_custom_style').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_temperature').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
-        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_independent_cache, #mimo_tts_debug_log_enabled, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_style, #mimo_tts_preprocess_keep_inner_monologue').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_independent_cache, #mimo_tts_debug_log_enabled, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_control_mode, #mimo_tts_preprocess_style, #mimo_tts_preprocess_keep_inner_monologue').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_independent_stop').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.stopIndependentAudio());
         $('#mimo_tts_clear_cache').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearAudioCacheWithToast());
         $('#mimo_tts_clear_debug_log').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearDebugLog());
@@ -439,6 +446,7 @@ class MimoTtsProvider {
         this.settings.preprocessBaseUrl = String($('#mimo_tts_preprocess_base_url').val() || '').trim();
         this.settings.preprocessModel = String($('#mimo_tts_preprocess_model').val() || '').trim();
         this.settings.preprocessTemperature = Number($('#mimo_tts_preprocess_temperature').val() || 0.2);
+        this.settings.preprocessControlMode = String($('#mimo_tts_preprocess_control_mode').val() || 'audio-tags');
         this.settings.preprocessStyle = String($('#mimo_tts_preprocess_style').val() || 'natural-dialogue');
         this.settings.preprocessKeepInnerMonologue = Boolean($('#mimo_tts_preprocess_keep_inner_monologue').is(':checked'));
         this.settings.preprocessCustomStyle = String($('#mimo_tts_preprocess_custom_style').val() || '').trim();
@@ -614,19 +622,19 @@ class MimoTtsProvider {
 
         try {
             const voice = await this.getIndependentVoice();
-            const preparedFullText = await this.preprocessText(text, voice);
-            if (!preparedFullText) {
+            const preparedSpeech = await this.preprocessSpeech(text, voice);
+            if (!preparedSpeech?.text) {
                 throw new Error('DeepSeek 预处理后没有可朗读对白。');
             }
 
-            const results = [await this.getOrCreateAudioBlob(text, voice, preparedFullText)];
+            const results = [await this.getOrCreateAudioBlob(text, voice, preparedSpeech)];
             const cacheHit = results.every((result) => result.cacheHit);
             const blobs = results.map((result) => result.blob);
 
             this.writeDebugLog({
                 title: '独立播放',
                 originalText: text,
-                processedText: preparedFullText,
+                processedText: this.formatPreparedSpeechForLog(preparedSpeech),
                 cacheHit,
                 voiceName: voice.name,
                 voiceId: voice.voice_id,
@@ -724,14 +732,17 @@ class MimoTtsProvider {
         return this.cleanMessageText(clone.innerText || clone.textContent || '');
     }
 
-    async getOrCreateAudioBlob(inputText, voice, preparedTextOverride = null) {
+    async getOrCreateAudioBlob(inputText, voice, preparedSpeechOverride = null) {
         const cleanInputText = this.cleanMessageText(inputText);
 
         if (!cleanInputText) {
             throw new Error('没有可朗读文本。');
         }
 
-        const cacheKey = await this.buildAudioCacheKey(cleanInputText, voice, preparedTextOverride);
+        const preparedSpeech = preparedSpeechOverride
+            ? this.normalizePreparedSpeech(preparedSpeechOverride, cleanInputText)
+            : await this.preprocessSpeech(cleanInputText, voice);
+        const cacheKey = await this.buildAudioCacheKey(cleanInputText, voice, preparedSpeech);
 
         if (this.settings.independentCacheEnabled) {
             const cachedEntry = await this.readAudioCache(cacheKey);
@@ -745,22 +756,21 @@ class MimoTtsProvider {
             }
         }
 
-        const preparedText = preparedTextOverride ?? await this.preprocessText(cleanInputText, voice);
-        if (!preparedText) {
+        if (!preparedSpeech?.text) {
             throw new Error('DeepSeek 预处理后没有可朗读对白。');
         }
 
-        const response = await this.fetchTtsGeneration(preparedText, voice);
+        const response = await this.fetchTtsGeneration(preparedSpeech.text, voice, preparedSpeech);
         const audioBlob = await response.blob();
 
         if (this.settings.independentCacheEnabled) {
-            await this.writeAudioCache(cacheKey, audioBlob, cleanInputText, preparedText, voice);
+            await this.writeAudioCache(cacheKey, audioBlob, cleanInputText, this.formatPreparedSpeechForLog(preparedSpeech), voice);
         }
 
         return {
             blob: audioBlob,
             cacheHit: false,
-            processedText: preparedText,
+            processedText: this.formatPreparedSpeechForLog(preparedSpeech),
         };
     }
 
@@ -1062,7 +1072,7 @@ class MimoTtsProvider {
 
     async buildAudioCacheKey(inputText, voice, preparedText = null) {
         const material = JSON.stringify({
-            version: 12,
+            version: 13,
             inputText,
             preparedText,
             voice,
@@ -1075,6 +1085,7 @@ class MimoTtsProvider {
             preprocessEnabled: this.settings.preprocessEnabled,
             preprocessModel: this.settings.preprocessModel,
             preprocessTemperature: this.settings.preprocessTemperature,
+            preprocessControlMode: this.getPreprocessControlMode(),
             preprocessStyle: this.settings.preprocessStyle,
             preprocessKeepInnerMonologue: this.settings.preprocessKeepInnerMonologue,
             preprocessCustomStyle: this.settings.preprocessCustomStyle,
@@ -1250,7 +1261,7 @@ class MimoTtsProvider {
         });
     }
 
-    async fetchTtsGeneration(inputText, voice) {
+    async fetchTtsGeneration(inputText, voice, preparedSpeech = null) {
         if (!this.settings.apiKey) {
             throw new Error('MiMo API Key is required.');
         }
@@ -1261,7 +1272,7 @@ class MimoTtsProvider {
                 'Content-Type': 'application/json',
                 'api-key': this.settings.apiKey,
             },
-            body: JSON.stringify(this.buildRequestBody(inputText, voice)),
+            body: JSON.stringify(this.buildRequestBody(inputText, voice, preparedSpeech)),
         }, 90000);
 
         const raw = await response.text();
@@ -1288,8 +1299,13 @@ class MimoTtsProvider {
     }
 
     async preprocessText(inputText, voice) {
+        const preparedSpeech = await this.preprocessSpeech(inputText, voice);
+        return preparedSpeech?.text || '';
+    }
+
+    async preprocessSpeech(inputText, voice) {
         if (!this.settings.preprocessEnabled) {
-            return inputText;
+            return this.normalizePreparedSpeech(inputText, inputText);
         }
 
         try {
@@ -1297,16 +1313,24 @@ class MimoTtsProvider {
             const cleaned = this.cleanPreprocessorOutput(output);
 
             if (!cleaned || cleaned === '<EMPTY>') {
-                return '';
+                return this.normalizePreparedSpeech('', inputText);
             }
 
-            return cleaned;
+            if (this.getPreprocessControlMode() === 'natural-language') {
+                return this.parseNaturalLanguagePreprocessOutput(cleaned, inputText);
+            }
+
+            return this.normalizePreparedSpeech({
+                mode: 'audio-tags',
+                text: cleaned,
+                instruction: '',
+            }, inputText);
         } catch (error) {
             console.warn('MiMo TTS preprocessing failed', error);
 
             if (this.settings.preprocessFallbackToOriginal) {
                 this.showThrottledPreprocessWarning('DeepSeek 预处理失败，已使用原文继续合成。');
-                return inputText;
+                return this.normalizePreparedSpeech(inputText, inputText);
             }
 
             throw error;
@@ -1328,7 +1352,7 @@ class MimoTtsProvider {
                         role: 'system',
                         content: [
                             this.settings.preprocessPrompt || this.defaultSettings.preprocessPrompt,
-                            this.buildAudioTagInstruction(),
+                            this.buildPreprocessControlModeInstruction(),
                             this.buildStyleInstruction(),
                             this.buildInnerMonologueInstruction(),
                         ].filter(Boolean).join('\n\n'),
@@ -1370,12 +1394,86 @@ class MimoTtsProvider {
 
     cleanPreprocessorOutput(output) {
         return String(output || '')
-            .replace(/^```(?:text|txt|markdown)?/i, '')
+            .replace(/^```(?:text|txt|markdown|json)?/i, '')
             .replace(/```$/i, '')
             .replace(/^\s*(?:处理后文本|处理结果|最终文本|输出|朗读文本|TTS文本)\s*[:：]\s*/i, '')
             .replace(/^\s*[-*]\s+/gm, '')
             .replace(/^["'“”]+|["'“”]+$/g, '')
             .trim();
+    }
+
+    parseNaturalLanguagePreprocessOutput(output, fallbackText) {
+        const parsed = this.tryParseJsonObject(output);
+
+        if (parsed) {
+            const text = String(parsed.text || parsed.assistant || parsed.assistantContent || fallbackText || '').trim();
+            const instruction = String(parsed.instruction || parsed.user || parsed.userContent || '').trim();
+            if (text === '<EMPTY>') {
+                return this.normalizePreparedSpeech('', fallbackText);
+            }
+            return this.normalizePreparedSpeech({
+                mode: 'natural-language',
+                text,
+                instruction,
+            }, fallbackText);
+        }
+
+        return this.normalizePreparedSpeech({
+            mode: 'natural-language',
+            text: fallbackText,
+            instruction: output,
+        }, fallbackText);
+    }
+
+    tryParseJsonObject(value) {
+        const text = String(value || '').trim();
+        const candidates = [
+            text,
+            text.match(/\{[\s\S]*\}/)?.[0] || '',
+        ].filter(Boolean);
+
+        for (const candidate of candidates) {
+            try {
+                const parsed = JSON.parse(candidate);
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    return parsed;
+                }
+            } catch {
+                // Continue to the next candidate.
+            }
+        }
+
+        return null;
+    }
+
+    normalizePreparedSpeech(value, fallbackText = '') {
+        if (value && typeof value === 'object') {
+            return {
+                mode: value.mode || this.getPreprocessControlMode(),
+                text: String(value.text ?? fallbackText ?? '').trim(),
+                instruction: String(value.instruction || '').trim(),
+            };
+        }
+
+        return {
+            mode: this.settings.preprocessEnabled ? this.getPreprocessControlMode() : 'none',
+            text: String(value ?? fallbackText ?? '').trim(),
+            instruction: '',
+        };
+    }
+
+    formatPreparedSpeechForLog(preparedSpeech) {
+        const prepared = this.normalizePreparedSpeech(preparedSpeech);
+        const lines = [
+            `控制模式：${this.getPreprocessControlModeLabel(prepared.mode)}`,
+        ];
+
+        if (prepared.instruction) {
+            lines.push('MiMo user 控制：', prepared.instruction);
+        }
+
+        lines.push('MiMo assistant 文本：', prepared.text || '');
+        return lines.join('\n');
     }
 
     showThrottledPreprocessWarning(message) {
@@ -1423,11 +1521,41 @@ class MimoTtsProvider {
         return lines.join('\n');
     }
 
-    buildAudioTagInstruction() {
-        return `音频标签控制：
-1. 可以在完整朗读文本开头或句间插入括号标签，优先使用中文全角括号，例如：（东北话）（四川话）（河南话）（粤语）（孙悟空）（林黛玉）（唱歌）（小声）（轻声）（提高音量喊话）（语速加快）（语速放慢）（笑）（轻笑）（大笑）（冷笑）（苦笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（深呼吸）（急促呼吸）（咳嗽）（长叹一口气）（沉默片刻）。
-2. 方言、角色、唱歌这类整体风格标签应放在最开头；唱歌必须用（唱歌）开头。
-3. 情绪、呼吸、停顿、笑哭和语速标签可以插在对应句子前，但不要过度堆叠。`;
+    getPreprocessControlMode() {
+        return this.settings.preprocessControlMode === 'natural-language'
+            ? 'natural-language'
+            : 'audio-tags';
+    }
+
+    getPreprocessControlModeLabel(mode) {
+        return mode === 'natural-language' ? '自然语言控制' : mode === 'audio-tags' ? '音频标签控制' : '无预处理';
+    }
+
+    buildPreprocessControlModeInstruction() {
+        const shared = `MiMo v2.5 控制能力要求：
+1. 先判断这段文本是否需要多风格切换、多情绪混合、多粒度控制；需要时按段落、句子或短语细分控制，不需要时保持自然克制。
+2. 可控制语气、情绪、语速、音量、停顿、呼吸、笑哭、咳嗽、方言、角色化表达和唱歌；不要为了炫技过度堆叠。
+3. 保留原对白内容，不要为了风格控制改写对白本身。`;
+
+        if (this.getPreprocessControlMode() === 'natural-language') {
+            return `${shared}
+
+当前模式：自然语言控制。
+1. MiMo 请求中，风格控制会放在 role:user 的 content；目标合成文本会放在 role:assistant 的 content。
+2. 你必须输出一个 JSON 对象，不要 Markdown，不要解释。格式：{"instruction":"放进 role:user 的自然语言控制说明","text":"放进 role:assistant 的朗读文本"}。
+3. instruction 用自然语言描述整体和局部表演方式，例如“前半段压低声音、紧张急促，后半段放慢语速、带克制的苦笑”。可以描述多风格切换、多情绪混合和细粒度控制。
+4. text 只放要朗读的文本，不要插入（小声）（笑）这类音频标签；只裁掉非朗读内容。
+5. 如果没有任何可朗读内容，输出：{"instruction":"","text":"<EMPTY>"}。`;
+        }
+
+        return `${shared}
+
+当前模式：音频标签控制。
+1. MiMo 请求中，控制标签必须直接放在 role:assistant 的 content；role:user 只保留基础朗读说明。
+2. 只输出最终 assistant 文本，不要 Markdown，不要 JSON，不要解释。
+3. 可以在完整朗读文本开头或句间插入括号标签，优先使用中文全角括号，例如：（东北话）（四川话）（河南话）（粤语）（孙悟空）（林黛玉）（唱歌）（小声）（轻声）（提高音量喊话）（语速加快）（语速放慢）（笑）（轻笑）（大笑）（冷笑）（苦笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（深呼吸）（急促呼吸）（咳嗽）（长叹一口气）（沉默片刻）。
+4. 方言、角色、唱歌这类整体风格标签应放在最开头；唱歌必须用（唱歌）开头。
+5. 情绪、呼吸、停顿、笑哭和语速标签可以插在对应句子前，但不要过度堆叠。`;
     }
 
     buildInnerMonologueInstruction() {
@@ -1444,16 +1572,21 @@ class MimoTtsProvider {
             || null;
     }
 
-    buildRequestBody(inputText, voice) {
+    buildRequestBody(inputText, voice, preparedSpeech = null) {
         const voiceKind = this.getVoiceKind(voice);
+        const prepared = this.normalizePreparedSpeech(preparedSpeech || inputText, inputText);
         const model = {
             preset: this.settings.presetModel,
             clone: this.settings.voiceCloneModel,
         }[voiceKind] || this.settings.presetModel;
-        const userPrompt = {
+        const baseUserPrompt = {
             preset: this.settings.instruction,
             clone: voice.prompt || this.settings.instruction,
         }[voiceKind] || this.settings.instruction;
+        const userPrompt = [
+            baseUserPrompt || this.defaultSettings.instruction,
+            prepared.mode === 'natural-language' ? prepared.instruction : '',
+        ].filter(Boolean).join('\n\n');
 
         const body = {
             model,
@@ -1464,7 +1597,7 @@ class MimoTtsProvider {
                 },
                 {
                     role: 'assistant',
-                    content: inputText,
+                    content: prepared.text || inputText,
                 },
             ],
             audio: {
