@@ -41,7 +41,7 @@ class MimoTtsProvider {
         preprocessFallbackToOriginal: true,
         preprocessKeepInnerMonologue: true,
         preprocessControlMode: 'audio-tags',
-        preprocessNarrativeMode: 'condense',
+        preprocessNarrativeMode: 'remove',
         preprocessStyle: 'natural-dialogue',
         preprocessCustomStyle: '',
         preprocessPrompt: `你是 SillyTavern 角色对白的 TTS 表演脚本整理器。你的任务是把输入段落整理成适合 MiMo TTS 朗读的中文表演文本。
@@ -425,7 +425,7 @@ class MimoTtsProvider {
         this.renderStylePresetSelect();
         $('#mimo_tts_preprocess_style').val(this.settings.preprocessStyle);
         $('#mimo_tts_preprocess_keep_inner_monologue').prop('checked', Boolean(this.settings.preprocessKeepInnerMonologue));
-        $('#mimo_tts_preprocess_narrative_mode').val(this.settings.preprocessNarrativeMode || 'condense');
+        $('#mimo_tts_preprocess_narrative_mode').val(this.settings.preprocessNarrativeMode || 'remove');
         $('#mimo_tts_preprocess_custom_style').val(this.settings.preprocessCustomStyle);
         $('#mimo_tts_preprocess_fallback').prop('checked', Boolean(this.settings.preprocessFallbackToOriginal));
         $('#mimo_tts_preprocess_prompt').val(this.settings.preprocessPrompt);
@@ -511,7 +511,7 @@ class MimoTtsProvider {
         this.settings.preprocessControlMode = String($('#mimo_tts_preprocess_control_mode').val() || 'audio-tags');
         this.settings.preprocessStyle = String($('#mimo_tts_preprocess_style').val() || 'natural-dialogue');
         this.settings.preprocessKeepInnerMonologue = Boolean($('#mimo_tts_preprocess_keep_inner_monologue').is(':checked'));
-        this.settings.preprocessNarrativeMode = String($('#mimo_tts_preprocess_narrative_mode').val() || 'condense');
+        this.settings.preprocessNarrativeMode = String($('#mimo_tts_preprocess_narrative_mode').val() || 'remove');
         this.settings.preprocessCustomStyle = String($('#mimo_tts_preprocess_custom_style').val() || '').trim();
         this.settings.preprocessFallbackToOriginal = Boolean($('#mimo_tts_preprocess_fallback').is(':checked'));
         this.settings.preprocessPrompt = String($('#mimo_tts_preprocess_prompt').val() || '').trim();
@@ -1730,7 +1730,7 @@ class MimoTtsProvider {
     }
 
     buildNarrativeModeInstruction() {
-        const mode = this.settings.preprocessNarrativeMode || 'condense';
+        const mode = this.settings.preprocessNarrativeMode || 'remove';
 
         if (mode === 'remove') {
             return '本章处理规则：删除正文中所有非对话内容——场景描写、动作描写、旁白、环境描写，仅保留角色说出口的对白和内心独白。';
