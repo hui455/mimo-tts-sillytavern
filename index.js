@@ -1,4 +1,4 @@
-import { registerTtsProvider, saveTtsProviderSettings, getPreviewString, initVoiceMap } from '../tts/index.js';
+import { registerTtsProvider, saveTtsProviderSettings, getPreviewString, initVoiceMap } from '../../tts/index.js';
 
 class MimoTtsProvider {
     settings;
