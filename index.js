@@ -2232,9 +2232,6 @@ class MimoTtsProvider {
 
             const isLast = scene.id === 'other';
             const label = $('<span></span>').text(scene.name);
-            const keywords = $('<span></span>')
-                .addClass('mimo-tts-bg-scene-desc')
-                .text(scene.description ? `触发词：${scene.description}` : '');
 
             const fileInput = $(`<input type="file" accept="audio/*,.wav,.mp3" style="display:none;">`)
                 .on('change', async () => {
@@ -2278,7 +2275,7 @@ class MimoTtsProvider {
                 enabledCheck.prop('disabled', true).css({ opacity: 0.4 });
             }
 
-            row.append(enabledCheck, label, keywords, uploadButton, fileInput, fileName);
+            row.append(enabledCheck, label, uploadButton, fileInput, fileName);
             container.append(row);
         }
     }
