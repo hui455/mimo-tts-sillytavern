@@ -31,7 +31,35 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 
 - 预置音色走 `mimo-v2.5-tts`，插件会把音色作为 `audio.voice` 传给 MiMo。
 - 音色设计走 `mimo-v2.5-tts-voicedesign`，插件会把设计提示词放在 `user` 消息里，把朗读文本放在 `assistant` 消息里。
+- 可选启用 `DeepSeek 朗读前预处理`：先用 DeepSeek 去掉非对话内容，再把对白整理成带情绪、语速、停顿、呼吸、咳嗽、笑声等细粒度标注的 MiMo 朗读文本。
 - 角色音色映射、单条消息朗读、自动朗读和 `/speak` 都使用 SillyTavern 内置 TTS 功能。
+
+## DeepSeek 预处理风格
+
+预处理可以选择内置风格，也可以在 `自定义风格补充` 里继续追加要求。内置预设包括：
+
+- 自然对白
+- 亲密耳语
+- 喜剧吐槽
+- 疲惫低气压
+- 紧张碎碎念
+- 悲伤克制
+- 寒冷急促
+- 街头叫卖
+- 战斗急促
+- ASMR 轻声
+
+自定义风格示例：
+
+```text
+更傲娇一点，句尾带一点不服气；亲密场景用更轻的气声；战斗场景不要夸张喊叫。
+```
+
+预处理输出示例：
+
+```text
+（紧张，深呼吸）呼……冷静，冷静。不就是一个面试吗……（语速加快，碎碎念）自我介绍已经背了五十遍了，应该没问题的。加油，你可以的……（小声）哎呀，领带歪没歪？
+```
 
 ## 音色设计示例
 
@@ -57,4 +85,3 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 - SillyTavern 内置 TTS Provider：`public/scripts/extensions/tts`
 - 示例第三方扩展：<https://github.com/city-unit/st-extension-example>
 - MiMo V2.5 TTS 文档：<https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5>
-
