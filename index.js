@@ -255,21 +255,6 @@ class MimoTtsProvider {
                         <label for="mimo_tts_background_audio_volume">背景音量: <span id="mimo_tts_background_audio_volume_output"></span></label>
                         <input id="mimo_tts_background_audio_volume" type="range" min="0.05" max="0.8" step="0.05">
                         <div id="mimo_tts_background_scene_list" class="mimo-tts-list"></div>
-                        <div class="mimo-tts-file-row" style="margin-top: 8px;">
-                            <input id="mimo_tts_bg_scene_name" type="text" class="text_pole" placeholder="场景显示名" style="flex: 1;">
-                            <input id="mimo_tts_bg_scene_id" type="text" class="text_pole" placeholder="场景ID（英文）" style="flex: 1;">
-                        </div>
-                        <input id="mimo_tts_bg_scene_desc" type="text" class="text_pole" placeholder="触发关键词，逗号分隔。例如：亲吻,接吻,亲亲">
-                        <div class="mimo-tts-file-row">
-                            <input id="mimo_tts_bg_audio_file" type="file" accept="audio/*,.wav,.mp3">
-                            <input id="mimo_tts_choose_bg_audio_file" type="button" class="menu_button" value="上传背景声">
-                            <span id="mimo_tts_bg_audio_file_name">未选择文件</span>
-                        </div>
-                        <input id="mimo_tts_editing_bg_scene_id" type="hidden">
-                        <div>
-                            <input id="mimo_tts_add_bg_scene" type="button" class="menu_button" value="添加场景">
-                            <input id="mimo_tts_clear_bg_scene_form" type="button" class="menu_button" value="清空编辑">
-                        </div>
                     </div>
                     <hr>
                     <div class="tts_block flexFlowColumn">
@@ -461,13 +446,6 @@ class MimoTtsProvider {
         $('#mimo_tts_clone_voice_file').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.updateCloneFileName());
         $('#mimo_tts_background_audio_enabled').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_background_audio_volume').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
-        $('#mimo_tts_add_bg_scene').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.addOrUpdateBackgroundScene().catch((error) => {
-            console.error('MiMo Advanced background scene add failed', error);
-            toastr.error(error.message || String(error), providerName);
-        }));
-        $('#mimo_tts_clear_bg_scene_form').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearBackgroundSceneForm());
-        $('#mimo_tts_choose_bg_audio_file').off('.mimoAdvanced').on('click.mimoAdvanced', () => $('#mimo_tts_bg_audio_file').trigger('click'));
-        $('#mimo_tts_bg_audio_file').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.updateBackgroundFileName());
     }
 
     bindDrawerFallback() {
@@ -2242,129 +2220,67 @@ class MimoTtsProvider {
         container.empty();
 
         for (const scene of this.settings.backgroundScenes) {
-            const row = $('<div></div>').addClass('mimo-tts-list-item');
+            const row = $('<div></div>').addClass('mimo-tts-list-item mimo-tts-bg-scene-row');
+
             const enabledCheck = $('<input>')
                 .attr('type', 'checkbox')
                 .prop('checked', scene.enabled !== false)
                 .on('change', () => {
                     scene.enabled = enabledCheck.is(':checked');
-                    this.renderBackgroundSceneList();
                     saveSettingsDebounced();
                 });
-            const label = $('<span></span>').text(`${scene.name} (${scene.id})`);
-            const hasAudio = scene.audioDataUrl;
-            const audioNote = hasAudio ? ' [有音频]' : ' [无音频]';
-            const desc = $('<span></span>').css({ opacity: 0.7, fontSize: '0.85em' }).text(`${scene.description || ''}${audioNote}`);
-            const editButton = $('<button></button>')
-                .addClass('menu_button')
-                .attr('type', 'button')
-                .text('编辑')
-                .on('click', () => this.editBackgroundScene(scene));
-            const removeButton = $('<button></button>')
-                .addClass('menu_button')
-                .attr('type', 'button')
-                .text('删除')
-                .on('click', () => this.removeBackgroundScene(scene.id));
 
-            row.append(enabledCheck, label, desc, editButton, removeButton);
+            const isLast = scene.id === 'other';
+            const label = $('<span></span>').text(scene.name);
+            const keywords = $('<span></span>')
+                .addClass('mimo-tts-bg-scene-desc')
+                .text(scene.description ? `触发词：${scene.description}` : '');
+
+            const fileInput = $(`<input type="file" accept="audio/*,.wav,.mp3" style="display:none;">`)
+                .on('change', async () => {
+                    const file = fileInput[0]?.files?.[0];
+                    if (!file) return;
+                    try {
+                        const mimeType = this.normalizeCloneAudioMimeType(file.type, file.name);
+                        if (!mimeType) {
+                            toastr.error('背景声只支持 wav 或 mp3 音频。');
+                            return;
+                        }
+                        const audioDataUrl = await this.readFileAsDataUrl(file, mimeType);
+                        const base64 = audioDataUrl.split(',').pop() || '';
+                        if (base64.length > 10 * 1024 * 1024) {
+                            toastr.error('背景声音频 base64 超过 10MB，请换更短的样本。');
+                            return;
+                        }
+                        scene.audioDataUrl = audioDataUrl;
+                        scene.fileName = file.name;
+                        scene.mimeType = mimeType;
+                        saveSettingsDebounced();
+                        this.renderBackgroundSceneList();
+                        toastr.success(`${scene.name} 背景声已上传。`, 'MiMo Advanced');
+                    } catch (error) {
+                        toastr.error(error.message || String(error), 'MiMo Advanced');
+                    }
+                });
+
+            const uploadButton = $('<button></button>')
+                .addClass('menu_button')
+                .attr('type', 'button')
+                .text(scene.id === 'other' ? '—' : '上传')
+                .on('click', () => { fileInput.trigger('click'); });
+
+            const fileName = $('<span></span>')
+                .addClass('mimo-tts-bg-file-name')
+                .text(scene.fileName || (scene.audioDataUrl ? '已上传' : '未上传'));
+
+            if (isLast) {
+                uploadButton.prop('disabled', true).css({ opacity: 0.4 });
+                enabledCheck.prop('disabled', true).css({ opacity: 0.4 });
+            }
+
+            row.append(enabledCheck, label, keywords, uploadButton, fileInput, fileName);
             container.append(row);
         }
-    }
-
-    editBackgroundScene(scene) {
-        $('#mimo_tts_bg_scene_name').val(scene.name || '');
-        $('#mimo_tts_bg_scene_id').val(scene.id || '');
-        $('#mimo_tts_bg_scene_desc').val(scene.description || '');
-        $('#mimo_tts_editing_bg_scene_id').val(scene.id || '');
-        $('#mimo_tts_bg_audio_file').val('');
-        $('#mimo_tts_add_bg_scene').val('保存场景');
-        const fileNameHint = scene.fileName ? `保留原文件：${scene.fileName}` : (scene.audioDataUrl ? '保留原音频样本' : '未选择文件');
-        $('#mimo_tts_bg_audio_file_name').text(fileNameHint);
-    }
-
-    async addOrUpdateBackgroundScene() {
-        const name = String($('#mimo_tts_bg_scene_name').val() || '').trim();
-        const id = String($('#mimo_tts_bg_scene_id').val() || '').trim();
-        const description = String($('#mimo_tts_bg_scene_desc').val() || '').trim();
-        const editingId = String($('#mimo_tts_editing_bg_scene_id').val() || '').trim();
-
-        if (!name || !id) {
-            toastr.error('请填写场景显示名和 ID。');
-            return;
-        }
-
-        const existingScene = editingId
-            ? this.settings.backgroundScenes.find((scene) => scene.id === editingId)
-            : null;
-
-        const file = document.querySelector('#mimo_tts_bg_audio_file')?.files?.[0] || null;
-
-        let audioData = { audioDataUrl: '', fileName: '', mimeType: '' };
-        if (file) {
-            try {
-                audioData = await this.readBackgroundAudioFile(file);
-            } catch (error) {
-                toastr.error(error.message || String(error), 'MiMo Advanced');
-                return;
-            }
-        } else if (existingScene) {
-            audioData = {
-                audioDataUrl: existingScene.audioDataUrl || '',
-                fileName: existingScene.fileName || '',
-                mimeType: existingScene.mimeType || '',
-            };
-        }
-
-        const entry = {
-            id,
-            name,
-            description,
-            ...audioData,
-            enabled: existingScene ? existingScene.enabled : true,
-        };
-
-        if (editingId) {
-            this.settings.backgroundScenes = this.settings.backgroundScenes.map((scene) => scene.id === editingId ? entry : scene);
-        } else {
-            this.settings.backgroundScenes = [...this.settings.backgroundScenes, entry];
-        }
-
-        this.clearBackgroundSceneForm();
-        this.renderBackgroundSceneList();
-        saveSettingsDebounced();
-        toastr.success(editingId ? '场景已保存。' : '场景已添加。', 'MiMo Advanced');
-    }
-
-    async readBackgroundAudioFile(file) {
-        const mimeType = this.normalizeCloneAudioMimeType(file.type, file.name);
-        if (!mimeType) {
-            throw new Error('背景声只支持 wav 或 mp3 音频。');
-        }
-
-        const audioDataUrl = await this.readFileAsDataUrl(file, mimeType);
-        const base64 = audioDataUrl.split(',').pop() || '';
-        if (base64.length > 10 * 1024 * 1024) {
-            throw new Error('背景声音频 base64 超过 10MB，请换更短的样本。');
-        }
-
-        return { audioDataUrl, fileName: file.name, mimeType };
-    }
-
-    removeBackgroundScene(sceneId) {
-        this.settings.backgroundScenes = this.settings.backgroundScenes.filter((scene) => scene.id !== sceneId);
-        this.renderBackgroundSceneList();
-        saveSettingsDebounced();
-    }
-
-    clearBackgroundSceneForm() {
-        $('#mimo_tts_bg_scene_name, #mimo_tts_bg_scene_id, #mimo_tts_bg_scene_desc, #mimo_tts_editing_bg_scene_id, #mimo_tts_bg_audio_file').val('');
-        $('#mimo_tts_add_bg_scene').val('添加场景');
-        $('#mimo_tts_bg_audio_file_name').text('未选择文件');
-    }
-
-    updateBackgroundFileName() {
-        const file = document.querySelector('#mimo_tts_bg_audio_file')?.files?.[0] || null;
-        $('#mimo_tts_bg_audio_file_name').text(file?.name || '未选择文件');
     }
 }
 

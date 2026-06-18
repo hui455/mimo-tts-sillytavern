@@ -96,14 +96,23 @@
   overflow-wrap: anywhere;
 }
 
-#mimo_tts_background_scene_list .mimo-tts-list-item {
+.mimo-tts-bg-scene-row {
   flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 
-#mimo_tts_background_scene_list .mimo-tts-list-item input[type="checkbox"] {
+.mimo-tts-bg-scene-row input[type="checkbox"] {
   flex-shrink: 0;
 }
 
-#mimo_tts_choose_bg_audio_file {
-  flex-shrink: 0;
+.mimo-tts-bg-file-name {
+  opacity: 0.7;
+  font-size: 0.85em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
