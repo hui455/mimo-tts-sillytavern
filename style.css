@@ -88,3 +88,22 @@
   font-family: var(--monoFontFamily, monospace);
   white-space: pre-wrap;
 }
+
+.mimo-tts-bg-scene-desc {
+  opacity: 0.7;
+  font-size: 0.85em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#mimo_tts_background_scene_list .mimo-tts-list-item {
+  flex-wrap: wrap;
+}
+
+#mimo_tts_background_scene_list .mimo-tts-list-item input[type="checkbox"] {
+  flex-shrink: 0;
+}
+
+#mimo_tts_choose_bg_audio_file {
+  flex-shrink: 0;
+}

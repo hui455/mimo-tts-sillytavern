@@ -120,6 +120,15 @@ class MimoTtsProvider {
                 prompt: '女生对男朋友吵架后放软或哄他，前半段别扭、委屈，后半段逐渐温柔安定。要有沉默、叹气、放低姿态和情绪转弯，避免像念和解台词。适合和好、道歉、安慰、把话说开。常用（别扭）（轻声）（沉默片刻）（温柔）（长叹一口气）。',
             },
         ],
+        backgroundAudioEnabled: false,
+        backgroundAudioVolume: 0.3,
+        backgroundScenes: [
+            { id: 'kiss', name: '亲吻', description: '亲吻、接吻、亲亲、吻、啵', audioUrl: '', audioDataUrl: '', fileName: '', mimeType: '', enabled: true },
+            { id: 'ear', name: '舔耳', description: '舔耳、耳朵、耳语、耳边、舔耳朵', audioUrl: '', audioDataUrl: '', fileName: '', mimeType: '', enabled: true },
+            { id: 'oral', name: '口交', description: '口交、含住、舔、吞吐、吸', audioUrl: '', audioDataUrl: '', fileName: '', mimeType: '', enabled: true },
+            { id: 'sex', name: '做爱', description: '做爱、性交、插入、抽送、高潮、呻吟', audioUrl: '', audioDataUrl: '', fileName: '', mimeType: '', enabled: true },
+            { id: 'other', name: '其他', description: '其他场景或不相关', audioUrl: '', audioDataUrl: '', fileName: '', mimeType: '', enabled: false },
+        ],
     };
 
     get settingsHtml() {
@@ -235,6 +244,33 @@ class MimoTtsProvider {
                         </label>
                         <label for="mimo_tts_preprocess_prompt">预处理提示词</label>
                         <textarea id="mimo_tts_preprocess_prompt" class="text_pole" rows="12"></textarea>
+                    </div>
+                    <hr>
+                    <div class="tts_block flexFlowColumn">
+                        <h4>场景背景声</h4>
+                        <label>
+                            <input id="mimo_tts_background_audio_enabled" type="checkbox">
+                            启用背景声合成（检测场景后混合背景音）
+                        </label>
+                        <label for="mimo_tts_background_audio_volume">背景音量: <span id="mimo_tts_background_audio_volume_output"></span></label>
+                        <input id="mimo_tts_background_audio_volume" type="range" min="0.05" max="0.8" step="0.05">
+                        <div id="mimo_tts_background_scene_list" class="mimo-tts-list"></div>
+                        <div class="mimo-tts-file-row" style="margin-top: 8px;">
+                            <input id="mimo_tts_bg_scene_name" type="text" class="text_pole" placeholder="场景显示名" style="flex: 1;">
+                            <input id="mimo_tts_bg_scene_id" type="text" class="text_pole" placeholder="场景ID（英文）" style="flex: 1;">
+                        </div>
+                        <input id="mimo_tts_bg_scene_desc" type="text" class="text_pole" placeholder="场景描述/触发关键词，例如：下雨、暴雨、雨声">
+                        <div class="mimo-tts-file-row">
+                            <input id="mimo_tts_bg_audio_url" type="text" class="text_pole" placeholder="背景声音频 URL（可选）" style="flex: 2;">
+                            <input id="mimo_tts_bg_audio_file" type="file" accept="audio/*,.wav,.mp3">
+                            <input id="mimo_tts_choose_bg_audio_file" type="button" class="menu_button" value="选择文件">
+                            <span id="mimo_tts_bg_audio_file_name">未选择文件</span>
+                        </div>
+                        <input id="mimo_tts_editing_bg_scene_id" type="hidden">
+                        <div>
+                            <input id="mimo_tts_add_bg_scene" type="button" class="menu_button" value="添加场景">
+                            <input id="mimo_tts_clear_bg_scene_form" type="button" class="menu_button" value="清空编辑">
+                        </div>
                     </div>
                     <hr>
                     <div class="tts_block flexFlowColumn">
@@ -357,6 +393,7 @@ class MimoTtsProvider {
         this.bindSettingsEvents();
         this.bindDrawerFallback();
         this.renderVoiceLists();
+        this.renderBackgroundSceneList();
         this.setupIndependentButtons();
 
         try {
@@ -397,6 +434,9 @@ class MimoTtsProvider {
         $('#mimo_tts_preprocess_custom_style').val(this.settings.preprocessCustomStyle);
         $('#mimo_tts_preprocess_fallback').prop('checked', Boolean(this.settings.preprocessFallbackToOriginal));
         $('#mimo_tts_preprocess_prompt').val(this.settings.preprocessPrompt);
+        $('#mimo_tts_background_audio_enabled').prop('checked', Boolean(this.settings.backgroundAudioEnabled));
+        $('#mimo_tts_background_audio_volume').val(this.settings.backgroundAudioVolume);
+        $('#mimo_tts_background_audio_volume_output').text(Number(this.settings.backgroundAudioVolume).toFixed(2));
     }
 
     bindSettingsEvents() {
@@ -420,6 +460,15 @@ class MimoTtsProvider {
         $('#mimo_tts_clear_clone_voice_form').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearClonedVoiceForm());
         $('#mimo_tts_choose_clone_voice_file').off('.mimoAdvanced').on('click.mimoAdvanced', () => $('#mimo_tts_clone_voice_file').trigger('click'));
         $('#mimo_tts_clone_voice_file').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.updateCloneFileName());
+        $('#mimo_tts_background_audio_enabled').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_background_audio_volume').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_add_bg_scene').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.addOrUpdateBackgroundScene().catch((error) => {
+            console.error('MiMo Advanced background scene add failed', error);
+            toastr.error(error.message || String(error), providerName);
+        }));
+        $('#mimo_tts_clear_bg_scene_form').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearBackgroundSceneForm());
+        $('#mimo_tts_choose_bg_audio_file').off('.mimoAdvanced').on('click.mimoAdvanced', () => $('#mimo_tts_bg_audio_file').trigger('click'));
+        $('#mimo_tts_bg_audio_file').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.updateBackgroundFileName());
     }
 
     bindDrawerFallback() {
@@ -477,6 +526,9 @@ class MimoTtsProvider {
         this.settings.preprocessCustomStyle = String($('#mimo_tts_preprocess_custom_style').val() || '').trim();
         this.settings.preprocessFallbackToOriginal = Boolean($('#mimo_tts_preprocess_fallback').is(':checked'));
         this.settings.preprocessPrompt = String($('#mimo_tts_preprocess_prompt').val() || '').trim();
+        this.settings.backgroundAudioEnabled = Boolean($('#mimo_tts_background_audio_enabled').is(':checked'));
+        this.settings.backgroundAudioVolume = Number($('#mimo_tts_background_audio_volume').val() || 0.3);
+        $('#mimo_tts_background_audio_volume_output').text(Number(this.settings.backgroundAudioVolume).toFixed(2));
         $('#mimo_tts_preprocess_temperature_output').text(Number(this.settings.preprocessTemperature).toFixed(2));
         this.setupIndependentButtons();
         saveSettingsDebounced();
@@ -663,6 +715,7 @@ class MimoTtsProvider {
                 cacheHit,
                 voiceName: voice.name,
                 voiceId: voice.voice_id,
+                scene: this.getBackgroundSceneName(preparedSpeech?.scene),
             });
             button.mimoAudioBlobs = blobs;
             button.mimoSourceText = text;
@@ -786,7 +839,12 @@ class MimoTtsProvider {
         }
 
         const response = await this.fetchTtsGeneration(preparedSpeech.text, voice, preparedSpeech);
-        const audioBlob = await response.blob();
+        let audioBlob = await response.blob();
+
+        const scene = preparedSpeech?.scene;
+        if (this.settings.backgroundAudioEnabled && scene) {
+            audioBlob = await this.mixAudioWithBackground(audioBlob, scene);
+        }
 
         if (this.settings.independentCacheEnabled) {
             await this.writeAudioCache(cacheKey, audioBlob, cleanInputText, this.formatPreparedSpeechForLog(preparedSpeech), voice);
@@ -962,6 +1020,7 @@ class MimoTtsProvider {
             `时间：${new Date().toLocaleString()}`,
             `类型：${entry.title || '播放'}`,
             `音色：${entry.voiceName || ''} (${entry.voiceId || ''})`,
+            `场景：${entry.scene || '无'}`,
             `缓存：${entry.cacheHit ? '命中' : '未命中'}`,
             '原文：',
             entry.originalText || '',
@@ -1096,8 +1155,19 @@ class MimoTtsProvider {
     }
 
     async buildAudioCacheKey(inputText, voice, preparedText = null) {
+        let backgroundSceneSources = [];
+        if (this.settings.backgroundAudioEnabled) {
+            for (const scene of (this.settings.backgroundScenes || [])) {
+                backgroundSceneSources.push({
+                    id: scene.id,
+                    audioUrl: scene.audioUrl || '',
+                    audioDataHash: scene.audioDataUrl ? await this.sha256(scene.audioDataUrl) : '',
+                });
+            }
+        }
+
         const material = JSON.stringify({
-            version: 16,
+            version: 17,
             inputText,
             preparedText,
             voice,
@@ -1115,6 +1185,10 @@ class MimoTtsProvider {
             preprocessKeepInnerMonologue: this.settings.preprocessKeepInnerMonologue,
             preprocessCustomStyle: this.settings.preprocessCustomStyle,
             preprocessPrompt: this.settings.preprocessPrompt,
+            backgroundAudioEnabled: this.settings.backgroundAudioEnabled,
+            backgroundSceneId: preparedText?.scene || 'other',
+            backgroundVolume: this.settings.backgroundAudioVolume,
+            backgroundSceneSources,
         });
 
         return `mimo-audio:${await this.sha256(material)}`;
@@ -1330,32 +1404,48 @@ class MimoTtsProvider {
 
     async preprocessSpeech(inputText, voice) {
         if (!this.settings.preprocessEnabled) {
-            return this.normalizePreparedSpeech(inputText, inputText);
+            const result = this.normalizePreparedSpeech(inputText, inputText);
+            if (this.settings.backgroundAudioEnabled && this.settings.preprocessApiKey) {
+                result.scene = await this.classifyScene(inputText);
+            }
+            return result;
         }
 
         try {
             const output = await this.fetchPreprocessedText(inputText, voice);
-            const cleaned = this.cleanPreprocessorOutput(output);
+            const scene = this.extractSceneFromOutput(output);
+            const stripped = this.stripSceneTag(output);
+            const cleaned = this.cleanPreprocessorOutput(stripped);
 
             if (!cleaned || cleaned === '<EMPTY>') {
-                return this.normalizePreparedSpeech('', inputText);
+                const result = this.normalizePreparedSpeech('', inputText);
+                result.scene = scene;
+                return result;
             }
 
             if (this.getPreprocessControlMode() === 'natural-language') {
-                return this.parseNaturalLanguagePreprocessOutput(cleaned, inputText);
+                const result = this.parseNaturalLanguagePreprocessOutput(cleaned, inputText);
+                result.scene = scene;
+                return result;
             }
 
-            return this.normalizePreparedSpeech({
+            const result = this.normalizePreparedSpeech({
                 mode: 'audio-tags',
                 text: cleaned,
                 instruction: '',
             }, inputText);
+            result.scene = scene;
+            return result;
         } catch (error) {
             console.warn('MiMo TTS preprocessing failed', error);
 
             if (this.settings.preprocessFallbackToOriginal) {
                 this.showThrottledPreprocessWarning('DeepSeek 预处理失败，已使用原文继续合成。');
-                return this.normalizePreparedSpeech(inputText, inputText);
+                const result = this.normalizePreparedSpeech(inputText, inputText);
+                if (this.settings.backgroundAudioEnabled && this.settings.preprocessApiKey) {
+                    result.scene = await this.classifyScene(inputText);
+                }
+                return result;
             }
 
             throw error;
@@ -1381,6 +1471,7 @@ class MimoTtsProvider {
                             this.buildPreprocessControlModeInstruction(voice),
                             this.buildStyleInstruction(),
                             this.buildInnerMonologueInstruction(),
+                            this.buildBackgroundSceneInstruction(),
                         ].filter(Boolean).join('\n\n'),
                     },
                     {
@@ -1478,6 +1569,7 @@ class MimoTtsProvider {
                 mode: value.mode || this.getPreprocessControlMode(),
                 text: String(value.text ?? fallbackText ?? '').trim(),
                 instruction: String(value.instruction || '').trim(),
+                scene: value.scene || 'other',
             };
         }
 
@@ -1485,6 +1577,7 @@ class MimoTtsProvider {
             mode: this.settings.preprocessEnabled ? this.getPreprocessControlMode() : 'none',
             text: String(value ?? fallbackText ?? '').trim(),
             instruction: '',
+            scene: 'other',
         };
     }
 
@@ -1971,6 +2064,402 @@ class MimoTtsProvider {
             .toLowerCase();
 
         return slug || `voice-${Date.now()}`;
+    }
+
+    getEnabledBackgroundScenes() {
+        return (this.settings.backgroundScenes || []).filter((scene) => scene.enabled !== false);
+    }
+
+    buildBackgroundSceneInstruction() {
+        if (!this.settings.backgroundAudioEnabled) {
+            return '';
+        }
+
+        const enabledScenes = this.getEnabledBackgroundScenes();
+        if (!enabledScenes.length) {
+            return '';
+        }
+
+        const sceneList = enabledScenes.map((scene) => `- ${scene.id}: ${scene.description || scene.name}`).join('\n');
+
+        return `场景识别：
+根据消息内容判断所属场景，在输出开头注明场景ID。场景列表：
+${sceneList}
+- other: 其他场景或不相关
+
+输出格式要求：第一行必须是【场景：场景ID】，然后空一行再输出朗读内容。不要解释，不要 Markdown。`;
+    }
+
+    extractSceneFromOutput(output) {
+        const match = String(output || '').match(/^【场景：(\w+)】/);
+        if (match) {
+            const sceneId = match[1].toLowerCase();
+            const validIds = new Set((this.settings.backgroundScenes || []).map((s) => s.id));
+            return validIds.has(sceneId) ? sceneId : 'other';
+        }
+        return 'other';
+    }
+
+    stripSceneTag(output) {
+        return String(output || '').replace(/^【场景：\w+】\s*\n*/, '');
+    }
+
+    getBackgroundScene(sceneId) {
+        return this.settings.backgroundScenes.find((scene) => scene.id === sceneId && scene.enabled !== false) || null;
+    }
+
+    getBackgroundSceneName(sceneId) {
+        if (!sceneId || sceneId === 'other') {
+            return '无';
+        }
+        const scene = this.settings.backgroundScenes.find((s) => s.id === sceneId);
+        return scene ? `${scene.name} (${scene.id})` : sceneId;
+    }
+
+    async classifyScene(inputText) {
+        if (!this.settings.backgroundAudioEnabled || !this.settings.preprocessApiKey) {
+            return 'other';
+        }
+
+        const scenes = this.getEnabledBackgroundScenes();
+        if (!scenes.length) {
+            return 'other';
+        }
+
+        const sceneList = [
+            ...scenes.map((scene) => `- ${scene.id}: ${scene.description || scene.name}`),
+            '- other: 其他场景或不相关',
+        ].join('\n');
+
+        try {
+            const response = await this.fetchWithTimeout(`${this.normalizeBaseUrl(this.settings.preprocessBaseUrl)}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.settings.preprocessApiKey}`,
+                },
+                body: JSON.stringify({
+                    model: this.settings.preprocessModel || this.defaultSettings.preprocessModel,
+                    temperature: 0,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: `你是场景分类器。根据消息内容判断场景，只返回场景ID。
+场景列表：
+${sceneList}
+
+规则：只输出场景ID（如 kiss、ear、oral、sex、other），不要解释，不要其他任何内容。`,
+                        },
+                        { role: 'user', content: String(inputText || '').slice(0, 2000) },
+                    ],
+                }),
+            }, 15000);
+
+            const raw = await response.text();
+            let payload = {};
+
+            try {
+                payload = raw ? JSON.parse(raw) : {};
+            } catch {
+                payload = { raw };
+            }
+
+            if (!response.ok) {
+                throw new Error(`Scene classification HTTP ${response.status}`);
+            }
+
+            const content = String(payload?.choices?.[0]?.message?.content || '').trim().toLowerCase();
+            const validIds = new Set([...scenes.map((s) => s.id), 'other']);
+            return validIds.has(content) ? content : 'other';
+        } catch (error) {
+            console.warn('MiMo Advanced scene classification failed', error);
+            return 'none';
+        }
+    }
+
+    async loadBackgroundAudio(scene) {
+        if (!scene) {
+            return null;
+        }
+
+        if (scene.audioDataUrl) {
+            const base64 = scene.audioDataUrl.includes(',') ? scene.audioDataUrl.split(',').pop() : scene.audioDataUrl;
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i += 1) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return new Blob([bytes], { type: scene.mimeType || 'audio/wav' });
+        }
+
+        if (scene.audioUrl) {
+            try {
+                const response = await this.fetchWithTimeout(scene.audioUrl, {}, 30000);
+                if (response.ok) {
+                    return await response.blob();
+                }
+            } catch (error) {
+                console.warn('MiMo Advanced background audio fetch failed', scene.audioUrl, error);
+            }
+        }
+
+        return null;
+    }
+
+    async mixAudioWithBackground(ttsBlob, sceneId) {
+        const scene = this.getBackgroundScene(sceneId);
+        if (!scene) {
+            return ttsBlob;
+        }
+
+        const bgBlob = await this.loadBackgroundAudio(scene);
+        if (!bgBlob) {
+            return ttsBlob;
+        }
+
+        try {
+            const ttsArrayBuffer = await ttsBlob.arrayBuffer();
+            const bgArrayBuffer = await bgBlob.arrayBuffer();
+
+            const tempCtx = new OfflineAudioContext(2, 2, 44100);
+            const [ttsBuffer, bgBuffer] = await Promise.all([
+                tempCtx.decodeAudioData(ttsArrayBuffer.slice(0)),
+                tempCtx.decodeAudioData(bgArrayBuffer.slice(0)),
+            ]);
+
+            const sampleRate = ttsBuffer.sampleRate;
+            const numChannels = ttsBuffer.numberOfChannels;
+            const ttsLength = ttsBuffer.length;
+            const fadeLength = Math.floor(sampleRate * 0.3);
+            const paddingLength = Math.floor(sampleRate * 0.3);
+            const totalLength = ttsLength + paddingLength;
+
+            const mixCtx = new OfflineAudioContext(numChannels, totalLength, sampleRate);
+
+            const ttsSource = mixCtx.createBufferSource();
+            ttsSource.buffer = ttsBuffer;
+            ttsSource.connect(mixCtx.destination);
+            ttsSource.start(0);
+
+            const bgDuration = bgBuffer.duration;
+            const totalDuration = totalLength / sampleRate;
+            const bgVolume = Number(this.settings.backgroundAudioVolume) || 0.3;
+
+            for (let time = 0; time < totalDuration; time += bgDuration) {
+                const bgSource = mixCtx.createBufferSource();
+                bgSource.buffer = bgBuffer;
+
+                const bgGain = mixCtx.createGain();
+                bgGain.gain.setValueAtTime(0, time);
+                const fadeInEnd = time + Math.min(fadeLength / sampleRate, bgDuration * 0.3);
+                bgGain.gain.linearRampToValueAtTime(bgVolume, fadeInEnd);
+
+                const fadeOutStart = totalDuration - fadeLength / sampleRate;
+                if (fadeOutStart > time + 0.5) {
+                    bgGain.gain.setValueAtTime(bgVolume, Math.max(fadeOutStart, fadeInEnd));
+                    bgGain.gain.linearRampToValueAtTime(0, totalDuration);
+                } else {
+                    bgGain.gain.setValueAtTime(bgVolume, fadeInEnd);
+                }
+
+                bgSource.connect(bgGain);
+                bgGain.connect(mixCtx.destination);
+                bgSource.start(time, 0, Math.min(bgDuration, totalDuration - time));
+            }
+
+            const renderedBuffer = await mixCtx.startRendering();
+            return this.audioBufferToWavBlob(renderedBuffer);
+        } catch (error) {
+            console.warn('MiMo Advanced background audio mix failed', error);
+            return ttsBlob;
+        }
+    }
+
+    audioBufferToWavBlob(audioBuffer) {
+        const numChannels = audioBuffer.numberOfChannels;
+        const sampleRate = audioBuffer.sampleRate;
+        const bitsPerSample = 16;
+        const channelData = [];
+
+        for (let i = 0; i < numChannels; i += 1) {
+            channelData.push(audioBuffer.getChannelData(i));
+        }
+
+        const length = channelData[0].length;
+        const totalSamples = length * numChannels;
+        const dataSize = totalSamples * (bitsPerSample / 8);
+        const headerSize = 44;
+        const buffer = new ArrayBuffer(headerSize + dataSize);
+        const view = new DataView(buffer);
+
+        this.writeWavString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + dataSize, true);
+        this.writeWavString(view, 8, 'WAVE');
+        this.writeWavString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true);
+        view.setUint16(32, numChannels * (bitsPerSample / 8), true);
+        view.setUint16(34, bitsPerSample, true);
+        this.writeWavString(view, 36, 'data');
+        view.setUint32(40, dataSize, true);
+
+        let offset = 44;
+        for (let i = 0; i < length; i += 1) {
+            for (let ch = 0; ch < numChannels; ch += 1) {
+                let sample = Math.max(-1, Math.min(1, channelData[ch][i]));
+                sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                view.setInt16(offset, sample, true);
+                offset += 2;
+            }
+        }
+
+        return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    writeWavString(view, offset, string) {
+        for (let i = 0; i < string.length; i += 1) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    }
+
+    renderBackgroundSceneList() {
+        const container = $('#mimo_tts_background_scene_list');
+        if (!container.length) {
+            return;
+        }
+
+        container.empty();
+
+        for (const scene of this.settings.backgroundScenes) {
+            const row = $('<div></div>').addClass('mimo-tts-list-item');
+            const enabledCheck = $('<input>')
+                .attr('type', 'checkbox')
+                .prop('checked', scene.enabled !== false)
+                .on('change', () => {
+                    scene.enabled = enabledCheck.is(':checked');
+                    this.renderBackgroundSceneList();
+                    saveSettingsDebounced();
+                });
+            const label = $('<span></span>').text(`${scene.name} (${scene.id})`);
+            const hasAudio = scene.audioDataUrl || scene.audioUrl;
+            const audioNote = hasAudio ? ' [有音频]' : ' [无音频]';
+            const desc = $('<span></span>').css({ opacity: 0.7, fontSize: '0.85em' }).text(`${scene.description || ''}${audioNote}`);
+            const editButton = $('<button></button>')
+                .addClass('menu_button')
+                .attr('type', 'button')
+                .text('编辑')
+                .on('click', () => this.editBackgroundScene(scene));
+            const removeButton = $('<button></button>')
+                .addClass('menu_button')
+                .attr('type', 'button')
+                .text('删除')
+                .on('click', () => this.removeBackgroundScene(scene.id));
+
+            row.append(enabledCheck, label, desc, editButton, removeButton);
+            container.append(row);
+        }
+    }
+
+    editBackgroundScene(scene) {
+        $('#mimo_tts_bg_scene_name').val(scene.name || '');
+        $('#mimo_tts_bg_scene_id').val(scene.id || '');
+        $('#mimo_tts_bg_scene_desc').val(scene.description || '');
+        $('#mimo_tts_bg_audio_url').val(scene.audioUrl || '');
+        $('#mimo_tts_editing_bg_scene_id').val(scene.id || '');
+        $('#mimo_tts_bg_audio_file').val('');
+        $('#mimo_tts_add_bg_scene').val('保存场景');
+        const fileNameHint = scene.fileName ? `保留原文件：${scene.fileName}` : (scene.audioDataUrl ? '保留原音频样本' : '未选择文件');
+        $('#mimo_tts_bg_audio_file_name').text(fileNameHint);
+    }
+
+    async addOrUpdateBackgroundScene() {
+        const name = String($('#mimo_tts_bg_scene_name').val() || '').trim();
+        const id = String($('#mimo_tts_bg_scene_id').val() || '').trim();
+        const description = String($('#mimo_tts_bg_scene_desc').val() || '').trim();
+        const audioUrl = String($('#mimo_tts_bg_audio_url').val() || '').trim();
+        const editingId = String($('#mimo_tts_editing_bg_scene_id').val() || '').trim();
+
+        if (!name || !id) {
+            toastr.error('请填写场景显示名和 ID。');
+            return;
+        }
+
+        const existingScene = editingId
+            ? this.settings.backgroundScenes.find((scene) => scene.id === editingId)
+            : null;
+
+        const file = document.querySelector('#mimo_tts_bg_audio_file')?.files?.[0] || null;
+
+        let audioData = { audioDataUrl: '', fileName: '', mimeType: '' };
+        if (file) {
+            try {
+                audioData = await this.readBackgroundAudioFile(file);
+            } catch (error) {
+                toastr.error(error.message || String(error), 'MiMo Advanced');
+                return;
+            }
+        } else if (existingScene && !audioUrl) {
+            audioData = {
+                audioDataUrl: existingScene.audioDataUrl || '',
+                fileName: existingScene.fileName || '',
+                mimeType: existingScene.mimeType || '',
+            };
+        }
+
+        const entry = {
+            id,
+            name,
+            description,
+            audioUrl,
+            ...audioData,
+            enabled: existingScene ? existingScene.enabled : true,
+        };
+
+        if (editingId) {
+            this.settings.backgroundScenes = this.settings.backgroundScenes.map((scene) => scene.id === editingId ? entry : scene);
+        } else {
+            this.settings.backgroundScenes = [...this.settings.backgroundScenes, entry];
+        }
+
+        this.clearBackgroundSceneForm();
+        this.renderBackgroundSceneList();
+        saveSettingsDebounced();
+        toastr.success(editingId ? '场景已保存。' : '场景已添加。', 'MiMo Advanced');
+    }
+
+    async readBackgroundAudioFile(file) {
+        const mimeType = this.normalizeCloneAudioMimeType(file.type, file.name);
+        if (!mimeType) {
+            throw new Error('背景声只支持 wav 或 mp3 音频。');
+        }
+
+        const audioDataUrl = await this.readFileAsDataUrl(file, mimeType);
+        const base64 = audioDataUrl.split(',').pop() || '';
+        if (base64.length > 10 * 1024 * 1024) {
+            throw new Error('背景声音频 base64 超过 10MB，请换更短的样本。');
+        }
+
+        return { audioDataUrl, fileName: file.name, mimeType };
+    }
+
+    removeBackgroundScene(sceneId) {
+        this.settings.backgroundScenes = this.settings.backgroundScenes.filter((scene) => scene.id !== sceneId);
+        this.renderBackgroundSceneList();
+        saveSettingsDebounced();
+    }
+
+    clearBackgroundSceneForm() {
+        $('#mimo_tts_bg_scene_name, #mimo_tts_bg_scene_id, #mimo_tts_bg_scene_desc, #mimo_tts_bg_audio_url, #mimo_tts_editing_bg_scene_id, #mimo_tts_bg_audio_file').val('');
+        $('#mimo_tts_add_bg_scene').val('添加场景');
+        $('#mimo_tts_bg_audio_file_name').text('未选择文件');
+    }
+
+    updateBackgroundFileName() {
+        const file = document.querySelector('#mimo_tts_bg_audio_file')?.files?.[0] || null;
+        $('#mimo_tts_bg_audio_file_name').text(file?.name || '未选择文件');
     }
 }
 
