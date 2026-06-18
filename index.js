@@ -68,61 +68,61 @@ class MimoTtsProvider {
                 name: '设计音色-温柔女声',
                 voice_id: 'design:soft-female',
                 lang: 'zh-CN',
-                prompt: '一位二十多岁的中文女声，声音清亮但不尖，语气温柔自然，像深夜电台主持人。语速稍慢，咬字清晰，带一点治愈感和亲近感。',
+                prompt: '温柔清亮女声',
             },
             {
                 name: '设计音色-低沉男旁白',
                 voice_id: 'design:deep-male-narrator',
                 lang: 'zh-CN',
-                prompt: '一位三十岁左右的男性中文旁白，声音低沉、有磁性但不过分夸张。语气沉稳可信，吐字清楚，停顿自然，适合纪录片、科幻设定和严肃叙述。',
+                prompt: '低沉磁性男声',
             },
             {
                 name: '设计音色-傲娇少女',
                 voice_id: 'design:tsundere-girl',
                 lang: 'zh-CN',
-                prompt: '一位年轻中文女声，声音清亮灵动，语气带一点傲娇和不服气，句尾偶尔轻微上扬。吐槽时语速略快，但亲密或害羞时会小声放慢。',
+                prompt: '傲娇清亮少女',
             },
             {
                 name: '设计音色-软萌萝莉',
                 voice_id: 'design:soft-loli',
                 lang: 'zh-CN',
-                prompt: '一位中文萝莉感女声，声音软萌、轻快、偏高但不刺耳，语气天真亲近，咬字清楚。情绪开心时更活泼，委屈时会放慢并带一点小鼻音，适合可爱、撒娇和轻松日常对白。',
+                prompt: '软萌萝莉女声',
             },
             {
                 name: '设计音色-清甜少女',
                 voice_id: 'design:sweet-teen-girl',
                 lang: 'zh-CN',
-                prompt: '一位清甜自然的中文少女声线，声音干净明亮，年龄感年轻但不过度幼化。语气真诚、活泼，语速中等，害羞或小声吐槽时会略微降低音量，适合校园、恋爱、日常聊天和轻喜剧。',
+                prompt: '清甜自然少女',
             },
             {
                 name: '设计音色-疲惫姐姐',
                 voice_id: 'design:tired-sister',
                 lang: 'zh-CN',
-                prompt: '一位二十七岁左右的中文女声，声音温柔但明显疲惫，气息稍弱，语速偏慢，句尾自然下沉。适合深夜、加班、照顾人和低气压对白。',
+                prompt: '疲惫温柔姐姐',
             },
             {
                 name: '设计音色-元气主播',
                 voice_id: 'design:bright-streamer',
                 lang: 'zh-CN',
-                prompt: '一位年轻活泼的中文女声，声音明亮有元气，语速中等偏快，表达像直播或短视频口播，情绪饱满但不刺耳，适合轻松、搞笑和热闹场景。',
+                prompt: '明亮元气主播',
             },
             {
                 name: '设计音色-冷静御姐',
                 voice_id: 'design:calm-older-sister',
                 lang: 'zh-CN',
-                prompt: '一位成熟中文女声，声音干净、冷静、压迫感轻微。语速稳定，情绪克制，咬字清晰，适合指挥、审问、理性分析和带距离感的角色。',
+                prompt: '冷静成熟御姐',
             },
             {
                 name: '设计音色-少年感男声',
                 voice_id: 'design:young-male',
                 lang: 'zh-CN',
-                prompt: '一位年轻中文男声，声音清爽有少年感，语气自然真诚，语速中等，情绪变化明显但不夸张，适合校园、冒险、日常对话和轻喜剧。',
+                prompt: '清爽少年男声',
             },
             {
                 name: '设计音色-ASMR耳语',
                 voice_id: 'design:asmr-whisper',
                 lang: 'zh-CN',
-                prompt: '一位贴近耳边的轻柔中文声线，音量低，气息感明显，语速慢，停顿细腻。适合睡前、安抚、亲密低语和轻声讲述，避免突然提高音量。',
+                prompt: '贴耳轻柔耳语',
             },
         ],
         preprocessStylePresets: [
@@ -332,6 +332,7 @@ class MimoTtsProvider {
 
         this.settings = extension_settings[extensionName];
         this.mergeDefaultVoiceCatalogs();
+        this.syncDefaultDesignedVoicePrompts();
         this.normalizeVoiceIds();
         return this.settings;
     }
@@ -353,6 +354,15 @@ class MimoTtsProvider {
         }
 
         return merged;
+    }
+
+    syncDefaultDesignedVoicePrompts() {
+        const shortPromptById = new Map(this.defaultSettings.designedVoices.map((voice) => [voice.voice_id, voice.prompt]));
+        this.settings.designedVoices = this.settings.designedVoices.map((voice) => (
+            shortPromptById.has(voice.voice_id)
+                ? { ...voice, prompt: shortPromptById.get(voice.voice_id) }
+                : voice
+        ));
     }
 
     async loadSettings(settings) {
