@@ -1255,11 +1255,19 @@ class MimoTtsProvider {
     }
 
     cleanMessageText(text) {
-        return this.removeThinkingText(String(text || ''))
+        let result = this.removeThinkingText(String(text || ''))
             .replace(/```[\s\S]*?```/g, '')
             .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
             .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
             .replace(/<[^>]+>/g, '')
+            .replace(/^显示前端代码块\s*/gm, '');
+
+        const metaIndex = result.search(/\n(?:基本信息|互动角色|场景信息|系统信息)\s*[-–—]/);
+        if (metaIndex > 0) {
+            result = result.slice(0, metaIndex);
+        }
+
+        return result
             .replace(/\[[^\]]*?]\([^)]*?\)/g, '$1')
             .replace(/\{\{.*?\}\}/g, '')
             .replace(/&[a-z]+;/gi, '')
