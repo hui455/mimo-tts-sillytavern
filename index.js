@@ -69,61 +69,61 @@ class MimoTtsProvider {
                 name: '设计音色-温柔女声',
                 voice_id: 'design:soft-female',
                 lang: 'zh-CN',
-                prompt: '温柔清亮女声',
+                prompt: 'Young Chinese female, warm and confident, clear and soothing. Speaks slowly and naturally like a late-night radio host.',
             },
             {
                 name: '设计音色-低沉男旁白',
                 voice_id: 'design:deep-male-narrator',
                 lang: 'zh-CN',
-                prompt: '低沉磁性男声',
+                prompt: 'Deep magnetic middle-aged male narrator, calm and deliberate. Slow, steady rhythm, suitable for documentary narration.',
             },
             {
                 name: '设计音色-傲娇少女',
                 voice_id: 'design:tsundere-girl',
                 lang: 'zh-CN',
-                prompt: '傲娇清亮少女',
+                prompt: 'Young Chinese female with a bright, lively voice. Slightly tsundere, fast and playful when complaining, softer when shy.',
             },
             {
                 name: '设计音色-软萌萝莉',
                 voice_id: 'design:soft-loli',
                 lang: 'zh-CN',
-                prompt: '软萌萝莉女声',
+                prompt: 'Very cute young girl voice, soft, sweet, and light. Innocent tone with a bouncy rhythm, suitable for playful daily dialogue.',
             },
             {
                 name: '设计音色-清甜少女',
                 voice_id: 'design:sweet-teen-girl',
                 lang: 'zh-CN',
-                prompt: '清甜自然少女',
+                prompt: 'Sweet teenage Chinese female voice, clean and bright. Natural, sincere, and lively, with a relaxed medium pace.',
             },
             {
                 name: '设计音色-疲惫姐姐',
                 voice_id: 'design:tired-sister',
                 lang: 'zh-CN',
-                prompt: '疲惫温柔姐姐',
+                prompt: 'Gentle young adult Chinese female, soft but slightly tired. Slow pace, weak breath, suitable for late-night exhausted dialogue.',
             },
             {
                 name: '设计音色-元气主播',
                 voice_id: 'design:bright-streamer',
                 lang: 'zh-CN',
-                prompt: '明亮元气主播',
+                prompt: 'Bright energetic young female streamer voice. Fast pace, cheerful rhythm, expressive and conversational.',
             },
             {
                 name: '设计音色-冷静御姐',
                 voice_id: 'design:calm-older-sister',
                 lang: 'zh-CN',
-                prompt: '冷静成熟御姐',
+                prompt: 'Mature Chinese female voice, calm, clean, and controlled. Steady medium-slow pace, slightly cold and authoritative.',
             },
             {
                 name: '设计音色-少年感男声',
                 voice_id: 'design:young-male',
                 lang: 'zh-CN',
-                prompt: '清爽少年男声',
+                prompt: 'Young Chinese male voice, fresh and sincere. Natural medium pace, clear pronunciation, suitable for daily dialogue.',
             },
             {
                 name: '设计音色-ASMR耳语',
                 voice_id: 'design:asmr-whisper',
                 lang: 'zh-CN',
-                prompt: '贴耳轻柔耳语',
+                prompt: 'Young female, extreme close-up ASMR feel. Very soft whisper, audible breathing, very slow pace, intimate and relaxing.',
             },
         ],
         clonedVoices: [],
@@ -349,7 +349,6 @@ class MimoTtsProvider {
 
         this.settings = extension_settings[extensionName];
         this.mergeDefaultVoiceCatalogs();
-        this.syncDefaultDesignedVoicePrompts();
         this.normalizeVoiceIds();
         return this.settings;
     }
@@ -372,15 +371,6 @@ class MimoTtsProvider {
         }
 
         return merged;
-    }
-
-    syncDefaultDesignedVoicePrompts() {
-        const shortPromptById = new Map(this.defaultSettings.designedVoices.map((voice) => [voice.voice_id, voice.prompt]));
-        this.settings.designedVoices = this.settings.designedVoices.map((voice) => (
-            shortPromptById.has(voice.voice_id)
-                ? { ...voice, prompt: shortPromptById.get(voice.voice_id) }
-                : voice
-        ));
     }
 
     async loadSettings(settings) {
