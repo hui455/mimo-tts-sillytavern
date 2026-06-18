@@ -254,6 +254,7 @@ class MimoTtsProvider {
                         </label>
                         <textarea id="mimo_tts_debug_log" class="text_pole" rows="10" readonly placeholder="点击独立播放或试听后，这里会显示原文、DeepSeek 处理结果、缓存命中和音色信息。"></textarea>
                         <input id="mimo_tts_clear_debug_log" type="button" class="menu_button" value="清空调试日志">
+                        <input id="mimo_tts_download_debug_log" type="button" class="menu_button" value="下载日志">
                     </div>
                     <hr>
                     <div class="tts_block flexFlowColumn">
@@ -484,6 +485,7 @@ class MimoTtsProvider {
         $('#mimo_tts_independent_stop').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.stopIndependentAudio());
         $('#mimo_tts_clear_cache').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearAudioCacheWithToast());
         $('#mimo_tts_clear_debug_log').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearDebugLog());
+        $('#mimo_tts_download_debug_log').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.downloadDebugLog());
         $('#mimo_tts_preview_selected_voice').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.previewSelectedIndependentVoice().catch((error) => {
             console.error('MiMo Advanced preview failed', error);
             toastr.error(error.message || String(error), 'MiMo Advanced');
@@ -1112,6 +1114,12 @@ class MimoTtsProvider {
             `音色：${entry.voiceName || ''} (${entry.voiceId || ''})`,
             `场景：${entry.scene || '无'}`,
             `缓存：${entry.cacheHit ? '命中' : '未命中'}`,
+            `叙述模式：${this.settings.preprocessNarrativeMode || 'remove'}`,
+            `控制模式：${this.getPreprocessControlModeLabel(this.getPreprocessControlMode())}`,
+            `预处理：${this.settings.preprocessEnabled ? '启用' : '关闭'}`,
+            `背景声：${this.settings.backgroundAudioEnabled ? '启用' : '关闭'}`,
+            `原文长度：${entry.originalText ? entry.originalText.length : 0} 字`,
+            `处理后长度：${entry.processedText ? entry.processedText.length : 0} 字`,
             '原文：',
             entry.originalText || '',
             '处理后：',
@@ -1119,7 +1127,7 @@ class MimoTtsProvider {
             '---',
         ];
 
-        textarea.value = `${textarea.value ? `${textarea.value}\n` : ''}${lines.join('\n')}`.slice(-50000);
+        textarea.value = `${textarea.value ? `${textarea.value}\n` : ''}${lines.join('\n')}`;
         textarea.scrollTop = textarea.scrollHeight;
     }
 
@@ -1128,6 +1136,18 @@ class MimoTtsProvider {
         if (textarea) {
             textarea.value = '';
         }
+    }
+
+    downloadDebugLog() {
+        const textarea = document.querySelector('#mimo_tts_debug_log');
+        if (!textarea?.value) {
+            toastr.warning('调试日志为空。', 'MiMo Advanced');
+            return;
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const blob = new Blob([textarea.value], { type: 'text/plain;charset=utf-8' });
+        this.downloadBlob(blob, `mimo-advanced-log-${timestamp}.txt`);
     }
 
     ensureDownloadButton(button, audioBlobs, sourceText) {
