@@ -31,7 +31,8 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 ## 使用
 
 - 预置音色走 `mimo-v2.5-tts`，插件会把音色作为 `audio.voice` 传给 MiMo。
-- 音色设计走 `mimo-v2.5-tts-voicedesign`，插件会把设计提示词放在 `user` 消息里，把朗读文本放在 `assistant` 消息里。
+- 音色设计走 `mimo-v2.5-tts-voicedesign`，插件会按 v2.5 文档把设计提示词单独放在 `user` 消息里，把朗读文本放在 `assistant` 消息里。
+- 声音克隆走 `mimo-v2.5-tts-voiceclone`，插件会把上传的 wav/mp3 样本转成 `data:audio/...;base64,...` 后放进 `audio.voice`。
 - 可选启用 `DeepSeek 朗读前预处理`：先用 DeepSeek 去掉非对话内容，再在对白前后加入情绪、语速、停顿、呼吸、咳嗽、笑声等括号标注。预处理不允许改写台词本身；如果 DeepSeek 返回内容改动了对白，插件会拒绝该结果并回退未改写文本。
 - 角色音色映射、单条消息朗读、自动朗读和 `/speak` 都使用 SillyTavern 内置 TTS 功能。
 - 可选启用 `给每条助手消息添加独立播放按钮`：只给非用户消息加一个独立播放按钮，点击后临时预处理并播放该条消息，不进入 SillyTavern 内置 TTS 队列。
@@ -93,11 +94,15 @@ SillyTavern/public/scripts/extensions/third-party/mimo-tts-sillytavern
 设计音色列表支持 `试听`、`编辑`、`删除`。点击 `编辑` 会把名称和提示词填回输入框，修改后点击 `保存设计音色` 即可覆盖原音色。
 如果试听结果偏离预期，优先把音色设计提示词压短到 15 字以内，例如 `温柔清亮女声`、`清爽少年男声`。
 
+## 声音克隆
+
+在 `新增声音克隆` 里填写显示名，上传 wav 或 mp3 样本后点击 `添加声音克隆`。添加后会出现在独立播放音色、第二人音色和 SillyTavern voice map 可选列表里。样本会随扩展设置保存在浏览器/SillyTavern 设置中，建议使用较短音频；插件会拒绝 base64 超过 10MB 的样本。
+
 ## 注意
 
 - API Key 会保存在 SillyTavern 的扩展设置里。只在你信任的本地环境使用，不要把带有 key 的设置分享给别人。
 - 如果浏览器直接请求 MiMo 时遇到 CORS 错误，把 `Base URL` 改成你自己的本地代理地址，并让代理转发到 `https://api.xiaomimimo.com/v1`。
-- 插件当前实现的是文本转语音和文字音色设计；音频样本克隆没有接入。
+- `启用 MiMo 文本优化` 默认关闭。调试读法时建议先保持关闭，避免 MiMo 在合成前二次优化文本。
 
 ## 参考
 

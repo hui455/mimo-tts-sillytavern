@@ -20,8 +20,9 @@ class MimoTtsProvider {
         baseUrl: 'https://api.xiaomimimo.com/v1',
         presetModel: 'mimo-v2.5-tts',
         voiceDesignModel: 'mimo-v2.5-tts-voicedesign',
+        voiceCloneModel: 'mimo-v2.5-tts-voiceclone',
         format: 'wav',
-        optimizeTextPreview: true,
+        optimizeTextPreview: false,
         instruction: '自然、清晰、口语化，情绪贴合文本内容。',
         independentMessageButtons: true,
         independentVoiceId: 'preset:冰糖',
@@ -125,6 +126,7 @@ class MimoTtsProvider {
                 prompt: '贴耳轻柔耳语',
             },
         ],
+        clonedVoices: [],
         preprocessStylePresets: [
             {
                 id: 'natural-dialogue',
@@ -211,6 +213,10 @@ class MimoTtsProvider {
                     <div class="tts_block">
                         <label for="mimo_tts_voice_design_model">音色设计模型</label>
                         <input id="mimo_tts_voice_design_model" type="text" class="text_pole">
+                    </div>
+                    <div class="tts_block">
+                        <label for="mimo_tts_voice_clone_model">声音克隆模型</label>
+                        <input id="mimo_tts_voice_clone_model" type="text" class="text_pole">
                     </div>
                     <div class="tts_block">
                         <label for="mimo_tts_instruction">朗读控制提示词</label>
@@ -308,6 +314,17 @@ class MimoTtsProvider {
                 <input id="mimo_tts_editing_design_voice_id" type="hidden">
                 <div id="mimo_tts_design_voice_list" class="mimo-tts-list"></div>
             </div>
+                    <hr>
+                    <div class="tts_block flexFlowColumn">
+                        <h4>新增声音克隆</h4>
+                        <input id="mimo_tts_clone_voice_name" type="text" class="text_pole" placeholder="显示名，例如：我的声音">
+                        <textarea id="mimo_tts_clone_voice_prompt" class="text_pole" rows="3" placeholder="可选朗读风格，例如：自然清晰"></textarea>
+                        <input id="mimo_tts_clone_voice_file" type="file" class="text_pole" accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,.wav,.mp3">
+                        <input id="mimo_tts_add_clone_voice" type="button" class="menu_button" value="添加声音克隆">
+                        <input id="mimo_tts_clear_clone_voice_form" type="button" class="menu_button" value="清空编辑">
+                        <input id="mimo_tts_editing_clone_voice_id" type="hidden">
+                        <div id="mimo_tts_clone_voice_list" class="mimo-tts-list"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -340,6 +357,7 @@ class MimoTtsProvider {
     mergeDefaultVoiceCatalogs() {
         this.settings.presetVoices = this.mergeVoiceCatalog(this.settings.presetVoices, this.defaultSettings.presetVoices);
         this.settings.designedVoices = this.mergeVoiceCatalog(this.settings.designedVoices, this.defaultSettings.designedVoices);
+        this.settings.clonedVoices = Array.isArray(this.settings.clonedVoices) ? this.settings.clonedVoices : [];
     }
 
     mergeVoiceCatalog(savedVoices, defaultVoices) {
@@ -409,6 +427,7 @@ class MimoTtsProvider {
         $('#mimo_tts_base_url').val(this.settings.baseUrl);
         $('#mimo_tts_preset_model').val(this.settings.presetModel);
         $('#mimo_tts_voice_design_model').val(this.settings.voiceDesignModel);
+        $('#mimo_tts_voice_clone_model').val(this.settings.voiceCloneModel);
         $('#mimo_tts_instruction').val(this.settings.instruction);
         $('#mimo_tts_format').val(this.settings.format);
         $('#mimo_tts_optimize_text_preview').prop('checked', Boolean(this.settings.optimizeTextPreview));
@@ -435,7 +454,7 @@ class MimoTtsProvider {
     }
 
     bindSettingsEvents() {
-        $('#mimo_tts_api_key, #mimo_tts_base_url, #mimo_tts_preset_model, #mimo_tts_voice_design_model, #mimo_tts_instruction, #mimo_tts_preview_text').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_api_key, #mimo_tts_base_url, #mimo_tts_preset_model, #mimo_tts_voice_design_model, #mimo_tts_voice_clone_model, #mimo_tts_instruction, #mimo_tts_preview_text').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_api_key, #mimo_tts_preprocess_base_url, #mimo_tts_preprocess_model, #mimo_tts_preprocess_prompt').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_custom_style').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_temperature').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
@@ -450,6 +469,11 @@ class MimoTtsProvider {
         $('#mimo_tts_add_preset_voice').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.addPresetVoice());
         $('#mimo_tts_add_design_voice').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.addDesignedVoice());
         $('#mimo_tts_clear_design_voice_form').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearDesignedVoiceForm());
+        $('#mimo_tts_add_clone_voice').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.addClonedVoice().catch((error) => {
+            console.error('MiMo Advanced clone voice add failed', error);
+            toastr.error(error.message || String(error), providerName);
+        }));
+        $('#mimo_tts_clear_clone_voice_form').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearClonedVoiceForm());
     }
 
     bindDrawerFallback() {
@@ -473,6 +497,7 @@ class MimoTtsProvider {
         this.settings.baseUrl = String($('#mimo_tts_base_url').val() || '').trim();
         this.settings.presetModel = String($('#mimo_tts_preset_model').val() || '').trim();
         this.settings.voiceDesignModel = String($('#mimo_tts_voice_design_model').val() || '').trim();
+        this.settings.voiceCloneModel = String($('#mimo_tts_voice_clone_model').val() || '').trim();
         this.settings.instruction = String($('#mimo_tts_instruction').val() || '').trim();
         this.settings.format = String($('#mimo_tts_format').val() || 'wav');
         this.settings.optimizeTextPreview = Boolean($('#mimo_tts_optimize_text_preview').is(':checked'));
@@ -517,7 +542,7 @@ class MimoTtsProvider {
 
     async fetchTtsVoiceObjects() {
         this.normalizeVoiceIds();
-        return [...this.settings.presetVoices, ...this.settings.designedVoices];
+        return [...this.settings.presetVoices, ...this.settings.designedVoices, ...this.settings.clonedVoices];
     }
 
     async getVoice(voiceName) {
@@ -1070,6 +1095,7 @@ class MimoTtsProvider {
             baseUrl: this.normalizeBaseUrl(this.settings.baseUrl),
             presetModel: this.settings.presetModel,
             voiceDesignModel: this.settings.voiceDesignModel,
+            voiceCloneModel: this.settings.voiceCloneModel,
             format: this.settings.format,
             optimizeTextPreview: this.settings.optimizeTextPreview,
             instruction: this.settings.instruction,
@@ -1434,13 +1460,20 @@ class MimoTtsProvider {
     }
 
     buildRequestBody(inputText, voice) {
-        const isDesignedVoice = String(voice.voice_id).startsWith('design:');
-        const userPrompt = isDesignedVoice
-            ? `${voice.prompt}\n\n朗读控制：${this.settings.instruction}`
-            : this.settings.instruction;
+        const voiceKind = this.getVoiceKind(voice);
+        const model = {
+            preset: this.settings.presetModel,
+            design: this.settings.voiceDesignModel,
+            clone: this.settings.voiceCloneModel,
+        }[voiceKind] || this.settings.presetModel;
+        const userPrompt = {
+            preset: this.settings.instruction,
+            design: voice.prompt,
+            clone: voice.prompt || this.settings.instruction,
+        }[voiceKind] || this.settings.instruction;
 
         const body = {
-            model: isDesignedVoice ? this.settings.voiceDesignModel : this.settings.presetModel,
+            model,
             messages: [
                 {
                     role: 'user',
@@ -1457,11 +1490,29 @@ class MimoTtsProvider {
             },
         };
 
-        if (!isDesignedVoice) {
+        if (voiceKind === 'preset') {
             body.audio.voice = this.presetVoiceValue(voice);
         }
 
+        if (voiceKind === 'clone') {
+            if (!voice.audioDataUrl) {
+                throw new Error(`声音克隆音色缺少音频样本：${voice.name}`);
+            }
+            body.audio.voice = voice.audioDataUrl;
+        }
+
         return body;
+    }
+
+    getVoiceKind(voice) {
+        const voiceId = String(voice?.voice_id || '');
+        if (voiceId.startsWith('design:')) {
+            return 'design';
+        }
+        if (voiceId.startsWith('clone:')) {
+            return 'clone';
+        }
+        return 'preset';
     }
 
     extractAudio(payload) {
@@ -1527,6 +1578,18 @@ class MimoTtsProvider {
             lang: voice.lang || 'zh-CN',
             prompt: voice.prompt || '',
         }));
+
+        this.settings.clonedVoices = this.settings.clonedVoices.map((voice, index) => ({
+            ...voice,
+            voice_id: String(voice.voice_id || '').startsWith('clone:')
+                ? String(voice.voice_id)
+                : `clone:${this.slugify(voice.voice_id || voice.name || `clone-${index + 1}`)}`,
+            lang: voice.lang || 'zh-CN',
+            prompt: voice.prompt || '',
+            fileName: voice.fileName || '',
+            mimeType: voice.mimeType || '',
+            audioDataUrl: voice.audioDataUrl || '',
+        }));
     }
 
     addPresetVoice() {
@@ -1585,6 +1648,111 @@ class MimoTtsProvider {
         $('#mimo_tts_add_design_voice').val('添加设计音色');
     }
 
+    async addClonedVoice() {
+        const name = String($('#mimo_tts_clone_voice_name').val() || '').trim();
+        const prompt = String($('#mimo_tts_clone_voice_prompt').val() || '').trim();
+        const editingVoiceId = String($('#mimo_tts_editing_clone_voice_id').val() || '').trim();
+        const existingVoice = editingVoiceId
+            ? this.settings.clonedVoices.find((voice) => voice.voice_id === editingVoiceId)
+            : null;
+        const file = document.querySelector('#mimo_tts_clone_voice_file')?.files?.[0] || null;
+
+        if (!name) {
+            toastr.error('请填写声音克隆显示名。');
+            return;
+        }
+
+        if (!file && !existingVoice?.audioDataUrl) {
+            toastr.error('请选择声音克隆音频样本。');
+            return;
+        }
+
+        const audio = file ? await this.readCloneAudioFile(file) : {
+            audioDataUrl: existingVoice.audioDataUrl,
+            fileName: existingVoice.fileName,
+            mimeType: existingVoice.mimeType,
+        };
+        const entry = {
+            name,
+            voice_id: editingVoiceId || `clone:${this.slugify(name)}`,
+            lang: 'zh-CN',
+            prompt,
+            ...audio,
+        };
+
+        if (editingVoiceId) {
+            this.settings.clonedVoices = this.settings.clonedVoices.map((voice) => voice.voice_id === editingVoiceId ? entry : voice);
+            toastr.success('声音克隆已保存。', providerName);
+        } else {
+            this.settings.clonedVoices = this.upsertVoice(this.settings.clonedVoices, entry);
+            toastr.success('声音克隆已添加。', providerName);
+        }
+
+        this.clearClonedVoiceForm();
+        this.afterVoiceListChange();
+    }
+
+    async readCloneAudioFile(file) {
+        const mimeType = this.normalizeCloneAudioMimeType(file.type, file.name);
+
+        if (!mimeType) {
+            throw new Error('声音克隆只支持 wav 或 mp3 音频。');
+        }
+
+        const audioDataUrl = await this.readFileAsDataUrl(file, mimeType);
+        const base64 = audioDataUrl.split(',').pop() || '';
+        if (base64.length > 10 * 1024 * 1024) {
+            throw new Error('声音克隆音频 base64 超过 10MB，请换更短的样本。');
+        }
+
+        return {
+            audioDataUrl,
+            fileName: file.name,
+            mimeType,
+        };
+    }
+
+    normalizeCloneAudioMimeType(fileType, fileName) {
+        const lowerName = String(fileName || '').toLowerCase();
+        const type = String(fileType || '').toLowerCase();
+
+        if (type.includes('wav') || lowerName.endsWith('.wav')) {
+            return 'audio/wav';
+        }
+
+        if (type.includes('mpeg') || type.includes('mp3') || lowerName.endsWith('.mp3')) {
+            return 'audio/mpeg';
+        }
+
+        return '';
+    }
+
+    readFileAsDataUrl(file, mimeType) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = String(reader.result || '');
+                const base64 = result.includes(',') ? result.split(',').pop() : result;
+                resolve(`data:${mimeType};base64,${base64}`);
+            };
+            reader.onerror = () => reject(reader.error || new Error('读取声音克隆音频失败。'));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    editClonedVoice(voice) {
+        $('#mimo_tts_clone_voice_name').val(voice.name || '');
+        $('#mimo_tts_clone_voice_prompt').val(voice.prompt || '');
+        $('#mimo_tts_editing_clone_voice_id').val(voice.voice_id || '');
+        $('#mimo_tts_add_clone_voice').val('保存声音克隆');
+        $('#mimo_tts_clone_voice_file').val('');
+    }
+
+    clearClonedVoiceForm() {
+        $('#mimo_tts_clone_voice_name, #mimo_tts_clone_voice_prompt, #mimo_tts_editing_clone_voice_id, #mimo_tts_clone_voice_file').val('');
+        $('#mimo_tts_add_clone_voice').val('添加声音克隆');
+    }
+
     removeVoice(listName, voiceId) {
         this.settings[listName] = this.settings[listName].filter((voice) => voice.voice_id !== voiceId);
         this.afterVoiceListChange();
@@ -1606,6 +1774,7 @@ class MimoTtsProvider {
     renderVoiceLists() {
         this.renderVoiceList('#mimo_tts_preset_voice_list', 'presetVoices');
         this.renderVoiceList('#mimo_tts_design_voice_list', 'designedVoices');
+        this.renderVoiceList('#mimo_tts_clone_voice_list', 'clonedVoices');
         this.renderIndependentVoiceSelect();
         this.renderSecondVoiceSelect();
     }
@@ -1627,7 +1796,7 @@ class MimoTtsProvider {
         }
 
         const currentValue = this.settings.independentVoiceId;
-        const voices = [...this.settings.presetVoices, ...this.settings.designedVoices];
+        const voices = this.getAllConfiguredVoices();
         select.empty();
 
         for (const voice of voices) {
@@ -1650,7 +1819,7 @@ class MimoTtsProvider {
         }
 
         const currentValue = this.settings.secondVoiceId;
-        const voices = [...this.settings.presetVoices, ...this.settings.designedVoices];
+        const voices = this.getAllConfiguredVoices();
         select.empty();
 
         for (const voice of voices) {
@@ -1674,7 +1843,8 @@ class MimoTtsProvider {
 
         for (const voice of this.settings[listName]) {
             const row = $('<div></div>').addClass('mimo-tts-list-item');
-            const label = $('<span></span>').text(`${voice.name} (${voice.voice_id})`);
+            const detail = listName === 'clonedVoices' && voice.fileName ? `，${voice.fileName}` : '';
+            const label = $('<span></span>').text(`${voice.name} (${voice.voice_id}${detail})`);
             const previewButton = $('<button></button>')
                 .addClass('menu_button')
                 .attr('type', 'button')
@@ -1683,12 +1853,18 @@ class MimoTtsProvider {
                     console.error('MiMo Advanced voice preview failed', error);
                     toastr.error(error.message || String(error), providerName);
                 }));
-            const editButton = listName === 'designedVoices'
+            const editButton = listName === 'designedVoices' || listName === 'clonedVoices'
                 ? $('<button></button>')
                     .addClass('menu_button')
                     .attr('type', 'button')
                     .text('编辑')
-                    .on('click', () => this.editDesignedVoice(voice))
+                    .on('click', () => {
+                        if (listName === 'designedVoices') {
+                            this.editDesignedVoice(voice);
+                        } else {
+                            this.editClonedVoice(voice);
+                        }
+                    })
                 : null;
             const removeButton = $('<button></button>')
                 .addClass('menu_button')
@@ -1703,6 +1879,10 @@ class MimoTtsProvider {
             row.append(removeButton);
             container.append(row);
         }
+    }
+
+    getAllConfiguredVoices() {
+        return [...this.settings.presetVoices, ...this.settings.designedVoices, ...this.settings.clonedVoices];
     }
 
     slugify(value) {
