@@ -41,6 +41,7 @@ class MimoTtsProvider {
         preprocessFallbackToOriginal: true,
         preprocessKeepInnerMonologue: true,
         preprocessControlMode: 'audio-tags',
+        preprocessNarrativeMode: 'condense',
         preprocessStyle: 'natural-dialogue',
         preprocessCustomStyle: '',
         preprocessPrompt: `你是 SillyTavern 角色对白的 TTS 表演脚本整理器。你的任务是把输入段落整理成适合 MiMo TTS 朗读的中文表演文本。
@@ -48,9 +49,9 @@ class MimoTtsProvider {
 规则：
 1. 只输出当前控制模式要求的结果，不要解释，不要 Markdown；只有"自然语言控制"模式允许输出指定 JSON。
 2. 绝对不能改写、润色、扩写、删改或替换原对白文字本身；对白内容必须从输入里原样截取。
-3. 你只允许做当前模式要求的处理：浓缩保留正文叙述；或为 MiMo 生成自然语言控制说明；或在对白前/对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（轻笑）（大笑）（冷笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
-4. 正文里的场景描写、动作描写、旁白不要直接删除，而是浓缩为一句简短自然的衔接语，保留在对白之间作为过渡。例如原文"她慢慢走到窗边，手指在玻璃上划过，沉默了很久"可浓缩为"她走到窗边，沉默了一会儿"。
-5. 以下内容直接删除：系统提示、玩家指令、URL、代码块、角色名标签、楼层信息、表情包、纯括号动作说明（他笑了一下）（她点点头）。
+3. 你只允许做当前模式要求的处理：整理正文叙述；或为 MiMo 生成自然语言控制说明；或在对白前/对白间添加中文全角括号里的表演控制标注，例如：（紧张，深呼吸）（轻笑）（大笑）（冷笑）（抽泣）（呜咽）（哽咽）（嚎啕大哭）（咳嗽）（长叹一口气）（停顿片刻）（语速加快）（语速放慢）（提高音量喊话）。
+4. 去除非对话内容：系统提示、玩家指令、URL、代码块、角色名标签、楼层信息、表情包、纯括号动作说明（他笑了一下）（她点点头）。
+5. 正文叙述的处理方式请严格遵循后续"本章处理规则"中的指示。
 6. 保留真正应该被听见的对白、内心独白、喊话、低语和吐槽；保留称呼、口癖、错字和标点风格；保留句子间的正常感叹（呀、呢、吧、嘛 等句尾语气助词）。
 7. 删除或转换纯呻吟/娇喘/浪叫/喘息类拟声词（如：嗯～、啊～、哈啊、咕齁、咿咿、嗯嗯啊啊 等成片无实际语义的叫声），改用 MiMo 括号标注表现情绪，例如转换"嗯❤️～哈啊～"为（满足的轻哼）（意乱情迷的喘息）。禁止 MiMo 直接朗读这些无语义拟声词。
 8. 删除插入在中文句子中间的 emoji（❤️♡～等）和非文字符号。
@@ -239,6 +240,12 @@ class MimoTtsProvider {
                             <input id="mimo_tts_preprocess_keep_inner_monologue" type="checkbox">
                             保留心理活动和内心独白
                         </label>
+                        <label for="mimo_tts_preprocess_narrative_mode">正文叙述处理</label>
+                        <select id="mimo_tts_preprocess_narrative_mode" class="text_pole">
+                            <option value="remove">完整删除（只留对白）</option>
+                            <option value="condense">浓缩保留（一句衔接）</option>
+                            <option value="keep">全部保留（原文输出）</option>
+                        </select>
                         <label for="mimo_tts_preprocess_custom_style">自定义风格补充</label>
                         <textarea id="mimo_tts_preprocess_custom_style" class="text_pole" rows="4" placeholder="例如：更傲娇一点，句尾带一点不服气；亲密场景用更轻的气声；战斗场景不要夸张喊叫。"></textarea>
                         <label>
@@ -418,6 +425,7 @@ class MimoTtsProvider {
         this.renderStylePresetSelect();
         $('#mimo_tts_preprocess_style').val(this.settings.preprocessStyle);
         $('#mimo_tts_preprocess_keep_inner_monologue').prop('checked', Boolean(this.settings.preprocessKeepInnerMonologue));
+        $('#mimo_tts_preprocess_narrative_mode').val(this.settings.preprocessNarrativeMode || 'condense');
         $('#mimo_tts_preprocess_custom_style').val(this.settings.preprocessCustomStyle);
         $('#mimo_tts_preprocess_fallback').prop('checked', Boolean(this.settings.preprocessFallbackToOriginal));
         $('#mimo_tts_preprocess_prompt').val(this.settings.preprocessPrompt);
@@ -431,7 +439,7 @@ class MimoTtsProvider {
         $('#mimo_tts_preprocess_api_key, #mimo_tts_preprocess_base_url, #mimo_tts_preprocess_model, #mimo_tts_preprocess_prompt').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_custom_style').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_preprocess_temperature').off('.mimoAdvanced').on('input.mimoAdvanced', () => this.onSettingsChange());
-        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_independent_cache, #mimo_tts_debug_log_enabled, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_control_mode, #mimo_tts_preprocess_style, #mimo_tts_preprocess_keep_inner_monologue').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.onSettingsChange());
+        $('#mimo_tts_format, #mimo_tts_optimize_text_preview, #mimo_tts_independent_buttons, #mimo_tts_independent_voice, #mimo_tts_independent_cache, #mimo_tts_debug_log_enabled, #mimo_tts_preprocess_enabled, #mimo_tts_preprocess_fallback, #mimo_tts_preprocess_control_mode, #mimo_tts_preprocess_style, #mimo_tts_preprocess_keep_inner_monologue, #mimo_tts_preprocess_narrative_mode').off('.mimoAdvanced').on('change.mimoAdvanced', () => this.onSettingsChange());
         $('#mimo_tts_independent_stop').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.stopIndependentAudio());
         $('#mimo_tts_clear_cache').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearAudioCacheWithToast());
         $('#mimo_tts_clear_debug_log').off('.mimoAdvanced').on('click.mimoAdvanced', () => this.clearDebugLog());
@@ -503,6 +511,7 @@ class MimoTtsProvider {
         this.settings.preprocessControlMode = String($('#mimo_tts_preprocess_control_mode').val() || 'audio-tags');
         this.settings.preprocessStyle = String($('#mimo_tts_preprocess_style').val() || 'natural-dialogue');
         this.settings.preprocessKeepInnerMonologue = Boolean($('#mimo_tts_preprocess_keep_inner_monologue').is(':checked'));
+        this.settings.preprocessNarrativeMode = String($('#mimo_tts_preprocess_narrative_mode').val() || 'condense');
         this.settings.preprocessCustomStyle = String($('#mimo_tts_preprocess_custom_style').val() || '').trim();
         this.settings.preprocessFallbackToOriginal = Boolean($('#mimo_tts_preprocess_fallback').is(':checked'));
         this.settings.preprocessPrompt = String($('#mimo_tts_preprocess_prompt').val() || '').trim();
@@ -1220,6 +1229,7 @@ class MimoTtsProvider {
             preprocessControlMode: this.getPreprocessControlMode(),
             preprocessStyle: this.settings.preprocessStyle,
             preprocessKeepInnerMonologue: this.settings.preprocessKeepInnerMonologue,
+            preprocessNarrativeMode: this.settings.preprocessNarrativeMode,
             preprocessCustomStyle: this.settings.preprocessCustomStyle,
             preprocessPrompt: this.settings.preprocessPrompt,
             backgroundAudioEnabled: this.settings.backgroundAudioEnabled,
@@ -1492,6 +1502,7 @@ class MimoTtsProvider {
                             this.buildPreprocessControlModeInstruction(voice),
                             this.buildStyleInstruction(),
                             this.buildInnerMonologueInstruction(),
+                            this.buildNarrativeModeInstruction(),
                         ].filter(Boolean).join('\n\n'),
                     },
                     {
@@ -1716,6 +1727,20 @@ class MimoTtsProvider {
         }
 
         return '去除心理活动和内心独白，只保留真正说出口的对白、喊话、低语、吐槽。';
+    }
+
+    buildNarrativeModeInstruction() {
+        const mode = this.settings.preprocessNarrativeMode || 'condense';
+
+        if (mode === 'remove') {
+            return '本章处理规则：删除正文中所有非对话内容——场景描写、动作描写、旁白、环境描写，仅保留角色说出口的对白和内心独白。';
+        }
+
+        if (mode === 'keep') {
+            return '本章处理规则：保留所有正文内容完整输出，包括场景描写、动作描写、旁白、环境描写。原文有什么就输出什么，不做任何删减浓缩。';
+        }
+
+        return '本章处理规则：正文中的场景描写、动作描写、旁白不要直接删除，而是浓缩为一句简短自然的衔接语，保留在对白之间作为过渡。例如原文"她慢慢走到窗边，手指在玻璃上划过，沉默了很久"可浓缩为"她走到窗边，沉默了一会儿"。';
     }
 
     getStylePreset(id) {
